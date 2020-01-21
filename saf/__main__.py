@@ -1,6 +1,5 @@
-"""Usage: 
-    saf.py
-    saf.py (-p <task> -f <file>) --fo <fileformat> [-a <additional_parameter>]
+"""Usage:
+    __main__.py -f <file>
 
     Options:
     --problems    Show supported problem types
@@ -8,10 +7,28 @@
     -h --help     Show this screen.
     -v --version  Show version.
 """
+
 from docopt import docopt
+import networkx as nx
+from saf.validate import parseTGF
+from matplotlib import pyplot as plt
+
 
 def main(args):
-    print(args)
+    if not any(args.values()):
+        _showAbout()
+        return 0
+
+    file = arguments["<file>"]
+    AF = parseTGF(file)
+    nx.draw(AF, pos=nx.circular_layout(AF), node_color='r',
+            edge_color='b', with_labels=True)
+    plt.savefig('af.svg')
+
+
+def _showAbout():
+    ABOUT_INFO = "SAF v0.1\nDavid Simon Tetruashvili"
+    print(ABOUT_INFO)
 
 
 if __name__ == "__main__":
