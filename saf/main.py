@@ -11,6 +11,10 @@
 from docopt import docopt
 from saf.validate import parseTGF
 from saf.framework import ListGraphFramework as Framework
+from saf.theories import DIMACSParser, CNFTheory, inLab, outLab, undLab
+import subprocess
+from tempfile import NamedTemporaryFile
+from pathlib import Path
 
 
 def main(args):
@@ -22,7 +26,52 @@ def main(args):
     # TODO Add apx support
     arguments, attacks = parseTGF(file)
     AF = Framework(arguments, attacks)
-    print('Representation:\n', AF)
+
+    # TODO Move to another place
+    unique_theory = CNFTheory(
+        lambda a, _: [[inLab(a), outLab(a), undLab(a)],
+                      [-inLab(a), -outLab(a)],
+                      [-inLab(a), -undLab(a)],
+                      [-outLab(a), -undLab(a)]])
+
+    in_complete_1 = CNFTheory(
+        lambda a, f: [[-outLab(attacker)
+                       for attacker in f.getAttackers(a)] + [inLab(a)]]
+    )
+
+    in_complete_2 = CNFTheory(
+        lambda a, f: [[-inLab(a), outLab(attacked)]
+                      for attacked in f.getAttackedBy(a)]
+    )
+
+    out_complete_1 = CNFTheory(
+        lambda a, f: [[-inLab(attacker), outLab(a)]
+                      for attacker in f.getAttackers(a)]
+    )
+
+    out_complete_2 = CNFTheory(
+        lambda a, f: [[inLab(attacker)
+                       for attacker in f.getAttackers(a)] + [-outLab(a)]]
+    )
+
+    theory_parser = DIMACSParser(unique_theory,
+                                 in_complete_1,
+                                 in_complete_2,
+                                 out_complete_1,
+                                 out_complete_2)
+    dimacs = theory_parser.parse(AF)
+
+    # TODO use stdin instead of file!
+    with NamedTemporaryFile(prefix='input_', delete=True, dir=Path('saf/tmp'), mode='w+') as i:
+        i.write(dimacs)
+        i.flush()
+        glucose_out = subprocess.run(
+            ['glucose',
+                Path(i.name),
+                '-model',
+                '-verb=0'],
+            capture_output=True).stdout.decode('ASCII').split('\n')[-2]
+    print(glucose_out)
 
 
 def _showAbout():

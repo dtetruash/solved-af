@@ -7,7 +7,8 @@ class FrameworkRepresentation(metaclass=abc.ABCMeta):
     def __init__(self, arguments, attacks):
         super().__init__()
         self._values_to_arguments = arguments
-        self._arguments_to_values = {arg: i for i, arg in enumerate(arguments)}
+        self._arguments_to_values = {arg: i for i,
+                                     arg in enumerate(arguments, start=1)}
         # TODO Probably a better way to do this? Populate as you convert?
         self._args = self.argumentsToValues(arguments)
         self._atts = [[self.argumentToValue(arg)
@@ -17,13 +18,16 @@ class FrameworkRepresentation(metaclass=abc.ABCMeta):
         return self._arguments_to_values[argument_name]
 
     def valueToArgument(self, argument_value: int) -> str:
-        return self._values_to_arguments[argument_value]
+        return self._values_to_arguments[argument_value - 1]
 
     def valuesToArguments(self, argument_values: List[int]) -> List[str]:
         return [self.valueToArgument(v) for v in argument_values]
 
     def argumentsToValues(self, argument_names: List[str]) -> List[int]:
         return [self.argumentToValue(v) for v in argument_names]
+
+    def __iter__(self):
+        return iter(self._args)
 
     @classmethod
     def __subclasshook__(cls, subclass):
@@ -101,7 +105,7 @@ class ListGraphFramework(FrameworkRepresentation):
                 f'{white_space} {attacking_str}\n'
                 f'{white_space}\U0001f855\n'
                 f'{arg}\n'
-                f'{white_space}\U0001f856\n'
+                f'{white_space}\U0001f854\n'
                 f'{white_space} {attacked_by_str}\n\n'
             )
         return retStr
