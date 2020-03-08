@@ -59,19 +59,28 @@ def main(args):
                                  in_complete_2,
                                  out_complete_1,
                                  out_complete_2)
+
     dimacs = theory_parser.parse(AF)
 
-    # TODO use stdin instead of file!
-    with NamedTemporaryFile(prefix='input_', delete=True, dir=Path('saf/tmp'), mode='w+') as i:
+    # TODO use stdin instead of file! Via a pipe!
+    with NamedTemporaryFile(prefix='input_', delete=False, dir=Path('saf/tmp'), mode='w+') as i:
         i.write(dimacs)
         i.flush()
-        glucose_out = subprocess.run(
-            ['glucose',
-                Path(i.name),
-                '-model',
-                '-verb=0'],
-            capture_output=True).stdout.decode('ASCII').split('\n')[-2]
-    print(glucose_out)
+        while True:
+            glucose_out = subprocess.run(
+                ['glucose',
+                    Path(i.name),
+                    '-model',
+                    '-verb=0'],
+                capture_output=True).stdout.decode('ASCII').split('\n')[-2]
+            print(glucose_out)
+            if glucose_out == 's UNSATISFIABLE':
+                break
+            found_solution_negation_clause = theory_parser.parseCNFTheory([
+                [str(-lab_var) for lab_var
+                 in DIMACSParser.extractLabeling(glucose_out)]])
+            i.write(found_solution_negation_clause)
+            i.flush()
 
 
 def _showAbout():
@@ -81,5 +90,5 @@ def _showAbout():
 
 if __name__ == "__main__":
     args = docopt(__doc__, version='SAF v0.1')
-    print('Program args: ', args)
+    # print('Program args: ', args)
     main(args)

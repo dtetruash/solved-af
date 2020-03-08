@@ -1,23 +1,38 @@
 import abc
 from saf.argument import Label
-from typing import List
+from typing import List, Tuple
 from saf.framework import FrameworkRepresentation as Framework
 
 
-def _argLabelVariable(arg_value: int, label=Label.In) -> int:
-    return 3 * (arg_value - 1) + label
+# TODO add caching to the variables generated
+
+def _calculateLabelVar(arg_value: int, label=Label.In) -> int:
+    return len(Label) * (arg_value - 1) + label
+
+
+label_var_cache = {}
+
+
+def _argToLabelVar(arg_value: int, label=Label.In) -> int:
+    label_key = f'{str(label)}-{str(arg_value)}'
+    if label_key not in label_var_cache:
+        label_var = _calculateLabelVar(arg_value, label)
+        label_var_cache[label_key] = label_var
+        return label_var
+    else:
+        return label_var_cache[label_key]
 
 
 def inLabelVariable(arg_value: int) -> int:
-    return _argLabelVariable(arg_value, Label.In)
+    return _argToLabelVar(arg_value, Label.In)
 
 
 def outLabelVariable(arg_value: int) -> int:
-    return _argLabelVariable(arg_value, Label.Out)
+    return _argToLabelVar(arg_value, Label.Out)
 
 
 def undLabelVariable(arg_value: int) -> int:
-    return _argLabelVariable(arg_value, Label.Und)
+    return _argToLabelVar(arg_value, Label.Und)
 
 
 inLab = inLabelVariable
@@ -57,7 +72,9 @@ class TheoryParser(metaclass=abc.ABCMeta):
         return (hasattr(subclass, 'parse') and
                 callable(subclass.parse) and
                 hasattr(subclass, 'parseCNFTheory') and
-                callable(subclass.parseCNFTheory) or
+                callable(subclass.parseCNFTheory) and
+                hasattr(subclass, 'extractExtention') and
+                callable(subclass.extractExtention) or
                 NotImplemented)
 
     @abc.abstractmethod
@@ -72,6 +89,10 @@ class TheoryParser(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError
 
+    @abc.abstractstaticmethod
+    def extractExtention(sat_output: str) -> List[int]:
+        raise NotImplementedError
+
 
 class DIMACSParser(TheoryParser):
     """Given a set of CNF formulae will produce a DIMACS
@@ -83,7 +104,6 @@ class DIMACSParser(TheoryParser):
         super().__init__(*theories)
 
     def parseCNFTheory(self, theory: CNFTheory):
-        print(theory)
         return '\n'.join([' '.join(str(x) for x in clause) + ' 0' for clause in theory])
 
     def parse(self, framework):
@@ -105,3 +125,15 @@ class DIMACSParser(TheoryParser):
         parsed_dimacs += self.parseCNFTheory(raw_clauses)
 
         return parsed_dimacs
+
+    @staticmethod
+    def extractExtention(sat_output: str) -> List[int]:
+        model = [int(lab_var) for lab_var in sat_output.split(' ')[1:-1]]
+        return[lab_var for lab_var in model
+               if lab_var > 0 and abs(lab_var)
+               in range(1, len(model), len(Label))]
+
+    @staticmethod
+    def extractLabeling(sat_output: str) -> List[int]:
+        return list(filter(lambda x: x > 0, [int(lab_var) for lab_var
+                                             in sat_output.split(' ')[1:-1]]))
