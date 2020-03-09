@@ -13,9 +13,7 @@ from saf.validate import parseTGF
 from saf.framework import ListGraphFramework as Framework
 # TODO May need to split saf.theories into a package
 from saf.theories import CompleteLabelingDIMACSParser, DIMACSParser
-import subprocess
-from tempfile import NamedTemporaryFile
-from pathlib import Path
+from subprocess import run, PIPE
 
 
 def main(args):
@@ -31,29 +29,23 @@ def main(args):
 
     theory_parser = CompleteLabelingDIMACSParser
 
-    sat_dimacs_input = theory_parser.parse(AF)
+    sat_input = theory_parser.parse(AF)
 
-    # TODO use stdin instead of file! Via a pipe!
-    # TODO Move to 'Generate complete extensions' part of the solver
-    with NamedTemporaryFile(prefix='input_', delete=False, dir=Path('saf/tmp'),
-                            mode='w+') as i:
-        i.write(sat_dimacs_input)
-        i.flush()
-        while True:
-            glucose_out = subprocess.run(
-                ['glucose',
-                    Path(i.name),
-                    '-model',
-                    '-verb=0'],
-                capture_output=True).stdout.decode('ASCII').split('\n')[-2]
-            print(glucose_out)
-            if glucose_out == 's UNSATISFIABLE':
-                break
-            found_solution_negation_clause = theory_parser.parseCNFTheory([
-                [str(-lab_var) for lab_var
-                 in DIMACSParser.extractLabeling(glucose_out)]])
-            i.write(found_solution_negation_clause)
-            i.flush()
+    SAT_COMMAND = ['glucose', '-model', '-verb=0']
+    while True:
+        sat_solver = run(SAT_COMMAND, stdout=PIPE,
+                         input=str(sat_input), encoding='ascii')
+        solution = sat_solver.stdout.split('\n')[-2]
+        if sat_solver.returncode == 20:
+            break
+        print(solution)
+        # TODO Encapsulate in a method
+        solution_labeling = DIMACSParser.extractLabeling(solution)
+        solution_negation_clause = [[str(-lab_var) for lab_var
+                                     in solution_labeling]]
+        solution_negation_dimacs = theory_parser.parseCNFTheory(
+            solution_negation_clause)
+        sat_input.addClause(solution_negation_dimacs)
 
 
 def _showAbout():

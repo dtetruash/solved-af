@@ -1,6 +1,6 @@
 import abc
 from saf.argument import Label
-from typing import List, Callable, Generator, NewType
+from typing import List, Callable, Generator, Tuple, NewType
 from saf.framework import FrameworkRepresentation as Framework
 
 
@@ -108,6 +108,35 @@ class TheoryParser(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
 
+class DIMACSHeader:
+    def __init__(self, num_of_vars=0, num_of_clauses=0):
+        self._vars = num_of_vars
+        self._clauses = num_of_clauses
+
+    def __str__(self):
+        return f"p cnf {self._vars} {self._clauses}\n"
+
+    def incrementClauses(self):
+        self._clauses += 1
+
+    def setClauses(self, num_of_clauses):
+        self._clauses = num_of_clauses
+
+
+# TODO FIXME Make this extent str via __new__
+class DIMACSInput:
+    def __init__(self, num_of_vars=0, num_of_clauses=0, content=''):
+        self._header = DIMACSHeader(num_of_vars, num_of_clauses)
+        self._content = content
+
+    def __str__(self):
+        return str(self._header) + self._content
+
+    def addClause(self, dimacs_clause: str):
+        self._content += dimacs_clause
+        self._header.incrementClauses()
+
+
 class DIMACSParser(TheoryParser):
     """Given a set of CNF formulae will produce a DIMACS
     formated file encoding the given argumentation framework
@@ -119,9 +148,9 @@ class DIMACSParser(TheoryParser):
 
     def parseCNFTheory(self, theory: CNFTheory):
         return '\n'.join([' '.join(str(x) for x in clause) + ' 0'
-                          for clause in theory])
+                          for clause in theory]) + '\n'
 
-    def parse(self, framework):
+    def parse(self, framework: Framework) -> DIMACSInput:
         # generate all theories in raw form,
         # count the number of clauses generated...
 
@@ -136,10 +165,9 @@ class DIMACSParser(TheoryParser):
             num_of_clauses += len(new_clauses)
             raw_clauses += new_clauses
 
-        parsed_dimacs = f"p cnf {num_of_vars} {num_of_clauses}\n"
-        parsed_dimacs += self.parseCNFTheory(raw_clauses)
+        dimacs_content = self.parseCNFTheory(raw_clauses)
 
-        return parsed_dimacs
+        return DIMACSInput(num_of_vars, num_of_clauses, dimacs_content)
 
     @staticmethod
     def extractExtention(sat_output: str) -> List[int]:
