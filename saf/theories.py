@@ -1,6 +1,6 @@
 import abc
 from saf.argument import Label
-from typing import List, Tuple
+from typing import List, Callable, Generator, NewType
 from saf.framework import FrameworkRepresentation as Framework
 
 
@@ -10,17 +10,17 @@ def _calculateLabelVar(arg_value: int, label=Label.In) -> int:
     return len(Label) * (arg_value - 1) + label
 
 
-label_var_cache = {}
+_label_var_cache = {}
 
 
 def _argToLabelVar(arg_value: int, label=Label.In) -> int:
     label_key = f'{str(label)}-{str(arg_value)}'
-    if label_key not in label_var_cache:
+    if label_key not in _label_var_cache:
         label_var = _calculateLabelVar(arg_value, label)
-        label_var_cache[label_key] = label_var
+        _label_var_cache[label_key] = label_var
         return label_var
     else:
-        return label_var_cache[label_key]
+        return _label_var_cache[label_key]
 
 
 def inLabelVariable(arg_value: int) -> int:
@@ -40,21 +40,35 @@ outLab = outLabelVariable
 undLab = undLabelVariable
 
 
+TheoryTemplate = NewType(
+    'TheoryTemplate', Callable[[int, Framework], List[List[int]]])
+TheoryRepresentation = NewType('TheoryRepresentation', List[List[int]])
+
+
 class CNFTheory:
     """Representation of a boolean CNF theory as an object.
     As a list of disjunctive clauses.
     """
 
-    def __init__(self, template):
+    def __init__(self, template: TheoryTemplate):
         super().__init__()
+        # FIXME template should build a clause? Or the whole theory?
         self._template = template
 
-    def generate(self, argument_value: int,
-                 framework: Framework) -> List[List[int]]:
-        ret_val = self._template(argument_value, framework)
-        return ret_val
+    @classmethod
+    def fromTemplateList(cls, templates: List[TheoryTemplate]) -> Generator:
+        return (cls(template) for template in templates)
 
-    def generateAll(self, argument_values: List[int], framework: Framework) -> List[List[int]]:
+    @classmethod
+    def fromTemplates(cls, *templates: TheoryTemplate) -> Generator:
+        return (cls(template) for template in templates)
+
+    def generate(self, argument_value: int,
+                 framework: Framework) -> TheoryRepresentation:
+        return self._template(argument_value, framework)
+
+    def generateAll(self, argument_values: List[int],
+                    framework: Framework) -> TheoryRepresentation:
         ret_cnf = []
         for arg_val in argument_values:
             ret_cnf += self.generate(arg_val, framework)
@@ -104,7 +118,8 @@ class DIMACSParser(TheoryParser):
         super().__init__(*theories)
 
     def parseCNFTheory(self, theory: CNFTheory):
-        return '\n'.join([' '.join(str(x) for x in clause) + ' 0' for clause in theory])
+        return '\n'.join([' '.join(str(x) for x in clause) + ' 0'
+                          for clause in theory])
 
     def parse(self, framework):
         # generate all theories in raw form,
@@ -133,7 +148,46 @@ class DIMACSParser(TheoryParser):
                if lab_var > 0 and abs(lab_var)
                in range(1, len(model), len(Label))]
 
+    # FIXME This method may need to be in GlucoseParser
     @staticmethod
     def extractLabeling(sat_output: str) -> List[int]:
+        # FIXME Convert to list comprehension instead
         return list(filter(lambda x: x > 0, [int(lab_var) for lab_var
                                              in sat_output.split(' ')[1:-1]]))
+
+
+"""
+Theory models for encoding a full AF for the complete extensions.
+"""
+
+
+def uniqueness_theory(a, _): return [[inLab(a), outLab(a), undLab(a)],
+                                     [-inLab(a), -outLab(a)],
+                                     [-inLab(a), -undLab(a)],
+                                     [-outLab(a), -undLab(a)]]
+
+
+def in_complete_1(a, f): return [[-outLab(attacker)
+                                  for attacker in f.getAttackers(a)]
+                                 + [inLab(a)]]
+
+
+def in_complete_2(a, f): return [[-inLab(a), outLab(attacked)]
+                                 for attacked in f.getAttackedBy(a)]
+
+
+def out_complete_1(a, f): return [[-inLab(attacker), outLab(a)]
+                                  for attacker in f.getAttackers(a)]
+
+
+def out_complete_2(a, f): return [[inLab(attacker)
+                                   for attacker in f.getAttackers(a)]
+                                  + [-outLab(a)]]
+
+
+CompleteLabelingDIMACSParser = DIMACSParser(
+    *CNFTheory.fromTemplates(uniqueness_theory,
+                             in_complete_1,
+                             in_complete_2,
+                             out_complete_1,
+                             out_complete_2))
