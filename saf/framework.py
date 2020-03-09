@@ -37,6 +37,8 @@ class FrameworkRepresentation(metaclass=abc.ABCMeta):
                 callable(subclass.getAttackedBy) and
                 hasattr(subclass, 'getArguments') and
                 callable(subclass.getArguments) and
+                hasattr(subclass, 'F') and
+                callable(subclass.F) and
                 hasattr(subclass, '__len__') and
                 callable(subclass.__len__) or
                 NotImplemented)
@@ -60,6 +62,11 @@ class FrameworkRepresentation(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def getAttacks(self) -> List[List[int]]:
         """Get a list of all attacks in the framework."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def F(argument_value: int) -> List[int]:
+        """The characteristic function F of the framework."""
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -113,6 +120,10 @@ class ListGraphFramework(FrameworkRepresentation):
     @staticmethod
     def _indexOf(arg):
         return arg - 1
+
+    def F(self, argument_value: int) -> List[int]:
+        # TODO Implement the characteristic function
+        pass
 
     def getAttackedBy(self, arg):
         return self._node_list[self._indexOf(arg)][0]
