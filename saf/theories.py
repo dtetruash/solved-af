@@ -6,21 +6,27 @@ from saf.framework import FrameworkRepresentation as Framework
 
 # TODO add caching to the variables generated
 
-def _calculateLabelVar(arg_value: int, label=Label.In) -> int:
-    return len(Label) * (arg_value - 1) + label
+def _calculateLabelVar(arg_value: int, num_of_labels, label=Label.In) -> int:
+    return num_of_labels * (arg_value - 1) + label
+
+
+def labelVarToArg(label_var: int, num_of_labels) -> float:
+    return (label_var // num_of_labels) + 1
 
 
 _label_var_cache = {}
 
 
 def _argToLabelVar(arg_value: int, label=Label.In) -> int:
-    label_key = f'{str(label)}-{str(arg_value)}'
-    if label_key not in _label_var_cache:
-        label_var = _calculateLabelVar(arg_value, label)
+    label_key = (int(label), arg_value)
+    try:
+        ret_val = _label_var_cache[label_key]
+    except KeyError:
+        label_var = _calculateLabelVar(arg_value, 3, label)
         _label_var_cache[label_key] = label_var
-        return label_var
-    else:
-        return _label_var_cache[label_key]
+        ret_val = label_var
+
+    return ret_val
 
 
 def inLabelVariable(arg_value: int) -> int:
@@ -150,6 +156,9 @@ class DIMACSParser(TheoryParser):
         return '\n'.join([' '.join(str(x) for x in clause) + ' 0'
                           for clause in theory]) + '\n'
 
+        # return ''.join(['\n'.join([' '.join(str(x) for x in clause) + ' 0'
+        #                           for clause in theory]), '\n'])
+
     def parse(self, framework: Framework) -> DIMACSInput:
         # generate all theories in raw form,
         # count the number of clauses generated...
@@ -158,13 +167,11 @@ class DIMACSParser(TheoryParser):
         # For each argument there is bool variable for each label
         # describing it.
         num_of_vars = len(framework) * len(Label)
-        num_of_clauses = 0
         argument_values = framework.getArguments()
         for theory in self._theories:
-            new_clauses = theory.generateAll(argument_values, framework)
-            num_of_clauses += len(new_clauses)
-            raw_clauses += new_clauses
+            raw_clauses += theory.generateAll(argument_values, framework)
 
+        num_of_clauses = len(raw_clauses)
         dimacs_content = self.parseCNFTheory(raw_clauses)
 
         return DIMACSInput(num_of_vars, num_of_clauses, dimacs_content)
@@ -172,7 +179,7 @@ class DIMACSParser(TheoryParser):
     @staticmethod
     def extractExtention(sat_output: str) -> List[int]:
         model = [int(lab_var) for lab_var in sat_output.split(' ')[1:-1]]
-        return[lab_var for lab_var in model
+        return[labelVarToArg(lab_var, 3) for lab_var in model
                if lab_var > 0 and abs(lab_var)
                in range(1, len(model), len(Label))]
 
