@@ -84,15 +84,11 @@ class ListGraphFramework(FrameworkRepresentation):
         """Construct the framework from parsed and validated data.
         Where arguments is a list of named/numbered arguments."""
         super().__init__(arguments, attacks)
-        self._node_list = []
-        for argument in self._args:
-            # TODO generalise the == to is?
-            attacked_by = [attacker for (attacker, attacked)
-                           in self._atts if argument == attacked]
-            attacking = [attacked for (attacker, attacked)
-                         in self._atts if argument == attacker]
-
-            self._node_list.append([attacking, attacked_by])
+        self._node_list = [([], []) for _ in range(len(self._args))]
+        # TODO generalise the == to is?
+        for (attacker, attacked) in self._atts:
+            self._node_list[attacker-1][0].append(attacked)
+            self._node_list[attacked-1][1].append(attacker)
 
         self.len = len(self._node_list)
 
