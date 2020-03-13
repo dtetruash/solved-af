@@ -178,12 +178,13 @@ class DIMACSParser(TheoryParser):
 
     @staticmethod
     def extractExtention(sat_output: str) -> List[int]:
-        model = [int(lab_var) for lab_var in sat_output.split(' ')[1:-1]]
+        model = [int(lab_var.strip())
+                 for lab_var in sat_output.split(' ')[1:-1]]
         return[labelVarToArg(lab_var, 3) for lab_var in model
                if lab_var > 0 and abs(lab_var)
                in range(1, len(model), len(Label))]
 
-    # FIXME This method may need to be in GlucoseParser
+    # FIXME Method doesn't tell what the labeling is.
     @staticmethod
     def extractLabeling(sat_output: str) -> List[int]:
         # FIXME Convert to list comprehension instead

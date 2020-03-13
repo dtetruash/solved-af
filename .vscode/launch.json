@@ -8,7 +8,7 @@
             "name": "SAF: Default",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/saf/main.py",
+            "program": "${workspaceFolder}/saf/__main__.py",
             "args": [],
             "console": "integratedTerminal"
         },
@@ -16,8 +16,47 @@
             "name": "SAF: With normal input",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/saf/main.py",
-            "args": ["-f", "inputs/input1.tgf"],
+            "program": "${workspaceFolder}/saf/__main__.py",
+            "args": [
+                "-f",
+                "inputs/input1.tgf",
+                "-fo",
+                "tgf",
+                "-p",
+                "EE-GR"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "SAF: Dummy input APX",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/saf/__main__.py",
+            "args": [
+                "-f",
+                "inputs/dummy.apx",
+                "-fo",
+                "apx",
+                "-p",
+                "EE-CO",
+                "-v"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "SAF: Empty AF, tgf",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/saf/__main__.py",
+            "args": [
+                "-f",
+                "inputs/empty.tgf",
+                "-fo",
+                "tgf",
+                "-p",
+                "EE-CO",
+                "-v"
+            ],
             "console": "integratedTerminal"
         }
     ]

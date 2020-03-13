@@ -4,6 +4,8 @@
     "python.linting.enabled": true,
     "cSpell.words": [
         "Arguemnt",
+        "CLDIMACS",
+        "nargs",
         "networkx"
     ]
 }

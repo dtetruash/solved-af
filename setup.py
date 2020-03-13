@@ -1,12 +1,12 @@
 from setuptools import setup
 
 setup(
-    name='saf',
+    name='solved-af',
     version='0.1',
     packages=['saf'],
     entry_points={
         'console_scripts': [
-            'saf = saf.__main__:main'
+            'solved-af = saf.__main__:main'
         ]
     }
 )

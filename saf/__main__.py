@@ -8,37 +8,29 @@
     -v --version  Show version.
 """
 
-import argparse
-from saf.io import parseInput, parseArguments
+import saf.io as io
 import sys
 from saf.framework import ListGraphFramework as Framework
 # TODO May need to split saf.theories into a package
 from saf.theories import CompleteLabelingDIMACSParser as CLDIMACSParser
 from saf.theories import DIMACSParser
+import saf.tasks as tasks
 from subprocess import run, PIPE
-
-PROBLEMS = ['EE']
-SEMANTICS = ['CO']
 
 
 def main():
-    if not len(sys.argv) > 1:
+    if len(sys.argv) == 1:
         _showAbout()
         sys.exit(0)
 
-    args = parseArguments()
-
-    if args.problems:
-        print(PROBLEMS)
-        sys.exit(1)
-
-    if args.formats:
-        print('[tgf, apx]')
-        sys.exit(1)
+    args = io.parseArguments()
 
     file = args.inputFile
-    # TODO Add apx support
-    arguments, attacks = parseInput(file)
+    file_format = args.fileFormat
+    arguments, attacks = io.parseInput(
+        file, format=file_format, validate=args.validate)
+
+    taskMethod = tasks.getTaskMethod(args.problemTask.upper())
 
     AF = Framework(arguments, attacks)
 
