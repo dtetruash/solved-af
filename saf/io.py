@@ -88,7 +88,7 @@ def _parseAPX(file_path, validate=False):
     attacks = []
     # https://git.io/Jv6wD - Taken from alviano/pyglaf implementation
     # TODO Make this pattern match 'att' and 'arg' respectively
-    pattern = re.compile('(?P<type>\w+)\s*\((?P<args>[\w,\s]+)\)\.')
+    pattern = re.compile("(?P<type>\w+)\s*\((?P<args>[\w,\s]+)\)\.")
 
     with open(file_path, 'r') as i:
         for line in i:
@@ -222,3 +222,34 @@ def parseArguments():
     args = parser.parse_args()
 
     return args
+
+
+def outputExtension(ext, sep=',', prefix='', suffix='\n'):
+    sys.stdout.write(F'{prefix}[{sep.join(ext)}]{suffix}')
+
+
+def outputDecision(accepted, suffix='\n'):
+    sys.stdout.write(('YES' if accepted else 'NO') + suffix)
+    sys.stdout.flush()
+
+
+# Rename for consistency
+outputDC = outputDS = outputDecision
+
+
+def outputSE(ext, suffix='\n'):
+    sys.stdout.write('NO') if ext is None else outputExtension(ext)
+    sys.stdout.write(suffix)
+    sys.stdout.flush()
+
+# ! FIXME Might be better to have a single print function and multiple
+# ! formatting functions
+
+
+def outputEE(ext_list, suffix='\n'):
+    sys.stdout.write('[\n')
+    for ext in ext_list:
+        outputExtension(ext, prefix='\t')
+    sys.stdout.write(']')
+    sys.stdout.write(suffix)
+    sys.stdout.flush()
