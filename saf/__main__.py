@@ -1,66 +1,74 @@
-"""Usage:
-    saf -f <file>
+"""
+usage: solved-af [-h] -p TASKNAME -f INPUTFILE -fo {tgf,apx} [-a <argumentname>]
+                [--formats] [--problems] [-v]
 
-    Options:
-    --problems    Show supported problem types
-    --formtats    Show supported intput file formats
-    -h --help     Show this screen.
-    -v --version  Show version.
+required arguments:
+  -p TASKNAME, --problemTask TASKNAME
+                        Path to file containing a argumentation framework
+                        encding
+  -f INPUTFILE, --inputFile INPUTFILE
+                        Path to input file encoding an framework
+  -fo {tgf,apx}, --fileFormat {tgf,apx}
+                        Input file format
+
+optional arguments:
+  -a <argumentname>, --argument <argumentname>
+                        Argument to check acceptance for
+  --formats             List all supported input file formats and exit
+  --problems            List all supported problems and exit
+  -v, --validate        Enable validation of the input file before parsing
 """
 
-import saf.io as io
 import sys
-from saf.framework import ListGraphFramework as Framework
-# TODO May need to split saf.theories into a package
-from saf.theories import CompleteLabelingDIMACSParser as CLDIMACSParser
-from saf.theories import DIMACSParser
+
+import saf.io as io
 import saf.tasks as tasks
-from subprocess import run, PIPE
+from saf.framework import ListGraphFramework as Framework
+
+
+NAME = 'Solved-AF'
+VERSION = 0.1
+AUTHOR = 'David Simon Tetruashvili'
+DESCRIPTION = 'A SAT-reduction-based Abstract Argumentation Framework.'
+LONG_DESCRIPTION = F"""{DESCRIPTION} Solved-AF is intended as an educational
+                    library and is structured and written accordingly."""
 
 
 def main():
-    if len(sys.argv) == 1:
-        _showAbout()
-        sys.exit(0)
+    # TODO Check for SAT solver installation!
 
     args = io.parseArguments()
 
-    file = args.inputFile
-    file_format = args.fileFormat
-    arguments, attacks = io.parseInput(
-        file, format=file_format, validate=args.validate)
+    arguments, attack_relation = io.parseInput(
+        args.inputFile, format=args.fileFormat, validate=args.validate)
 
-    taskMethod = tasks.getTaskMethod(args.problemTask.upper())
+    af = Framework(arguments, attack_relation)
 
-    AF = Framework(arguments, attacks)
+    # TODO encapsulate and made DRY
+    task_name = args.problemTask.upper()
+    task_type = task_name[:2]
+    parsed_solution = None
+    if args.argument is None:
+        taskMethod = tasks.getTaskMethod(task_name, is_enumeration=True)
+        solution = taskMethod(af)
+        if task_type == 'SE':
+            parsed_solution = af.valuesToArguments(solution)
+        elif task_type == 'EE':
+            parsed_solution = [af.valuesToArguments(ext) for ext in solution]
+    else:
+        taskMethod = tasks.getTaskMethod(task_name, is_enumeration=False)
+        parsed_solution = taskMethod(af, af.argumentToValue(args.argument))
 
-    theory_parser = CLDIMACSParser
-
-    sat_input = theory_parser.parse(AF)
-
-    SAT_COMMAND = ['glucose', '-model', '-verb=0']
-    unsatisfiable = False
-    while not unsatisfiable:
-        sat_solver = run(SAT_COMMAND, stdout=PIPE,
-                         input=str(sat_input), encoding='ascii')
-        solution = sat_solver.stdout.split('\n')[-2]
-        unsatisfiable = sat_solver.returncode == 20
-        if not unsatisfiable:
-            extension = DIMACSParser.extractExtention(solution)
-            print(AF.valuesToArguments(extension))
-            # TODO Encapsulate in a method
-            solution_labeling = DIMACSParser.extractLabeling(solution)
-            solution_negation_clause = [[str(-lab_var) for lab_var
-                                         in solution_labeling]]
-            solution_negation_dimacs = theory_parser.parseCNFTheory(
-                solution_negation_clause)
-            sat_input.addClause(solution_negation_dimacs)
+    io.outputSolution(parsed_solution, task_type)
 
 
 def _showAbout():
-    ABOUT_INFO = "SAF v0.1\nDavid Simon Tetruashvili"
+    ABOUT_INFO = F"{NAME} v{str(VERSION)}\n{AUTHOR}"
     print(ABOUT_INFO)
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 1:
+        _showAbout()
+        sys.exit(0)
     main()

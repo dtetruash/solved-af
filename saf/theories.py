@@ -1,6 +1,6 @@
 import abc
 from saf.argument import Label
-from typing import List, Callable, Generator, Tuple, NewType
+from typing import List, Callable, Generator, NewType
 from saf.framework import FrameworkRepresentation as Framework
 
 
@@ -99,13 +99,15 @@ class TheoryParser(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def parse(self, framework: Framework) -> str:
-        """Parse the given theories into a usable format to give to a solver as input.
+        """Parse the given theories into a usable format to give to a
+        solver as input.
         """
         raise NotImplementedError
 
     @abc.abstractmethod
     def parseCNFTheory(self, theory: List[List[int]]) -> str:
-        """Parse the given theories into a usable format to give to a solver as input.
+        """Parse the given theories into a usable format to give to a
+        solver as input.
         """
         raise NotImplementedError
 
@@ -120,7 +122,7 @@ class DIMACSHeader:
         self._clauses = num_of_clauses
 
     def __str__(self):
-        return f"p cnf {self._vars} {self._clauses}\n"
+        return F"p cnf {self._vars} {self._clauses}\n"
 
     def incrementClauses(self):
         self._clauses += 1
@@ -142,6 +144,9 @@ class DIMACSInput:
         self._content += dimacs_clause
         self._header.incrementClauses()
 
+    def encode(self):
+        return str(self)
+
 
 class DIMACSParser(TheoryParser):
     """Given a set of CNF formulae will produce a DIMACS
@@ -153,11 +158,9 @@ class DIMACSParser(TheoryParser):
         super().__init__(*theories)
 
     def parseCNFTheory(self, theory: CNFTheory):
-        return '\n'.join([' '.join(str(x) for x in clause) + ' 0'
-                          for clause in theory]) + '\n'
-
-        # return ''.join(['\n'.join([' '.join(str(x) for x in clause) + ' 0'
-        #                           for clause in theory]), '\n'])
+        clauses = [' '.join(str(x) for x in clause) +
+                   ' 0' for clause in theory]
+        return '\n'.join(clauses) + '\n'
 
     def parse(self, framework: Framework) -> DIMACSInput:
         # generate all theories in raw form,
@@ -193,7 +196,11 @@ class DIMACSParser(TheoryParser):
 
 
 """
-Theory models for encoding a full AF for the complete extensions.
+Theory model functions for encoding a full AF for the complete
+extensions.
+
+Each theory encoding functions take in the argument {a} they are
+encoding into theories and the framework {f} containing said argument.
 """
 
 
@@ -203,27 +210,30 @@ def uniqueness_theory(a, _): return [[inLab(a), outLab(a), undLab(a)],
                                      [-outLab(a), -undLab(a)]]
 
 
-def in_complete_1(a, f): return [[-outLab(attacker)
-                                  for attacker in f.getAttackers(a)]
-                                 + [inLab(a)]]
+def in_complete_theory_1(a, f): return [[-outLab(attacker)
+                                         for attacker in f.getAttackersOf(a)]
+                                        + [inLab(a)]]
 
 
-def in_complete_2(a, f): return [[-inLab(a), outLab(attacked)]
-                                 for attacked in f.getAttackedBy(a)]
+def in_complete_theory_2(a, f): return [[-inLab(a), outLab(attacked)]
+                                        for attacked in f.getAttackedBy(a)]
 
 
-def out_complete_1(a, f): return [[-inLab(attacker), outLab(a)]
-                                  for attacker in f.getAttackers(a)]
+def out_complete_theory_1(a, f): return [[-inLab(attacker), outLab(a)]
+                                         for attacker in f.getAttackersOf(a)]
 
 
-def out_complete_2(a, f): return [[inLab(attacker)
-                                   for attacker in f.getAttackers(a)]
-                                  + [-outLab(a)]]
+def out_complete_theory_2(a, f): return [[inLab(attacker)
+                                          for attacker in f.getAttackersOf(a)]
+                                         + [-outLab(a)]]
 
 
-CompleteLabelingDIMACSParser = DIMACSParser(
-    *CNFTheory.fromTemplates(uniqueness_theory,
-                             in_complete_1,
-                             in_complete_2,
-                             out_complete_1,
-                             out_complete_2))
+# A parser instance for encoding complete extentions
+
+complete_theories = CNFTheory.fromTemplates(uniqueness_theory,
+                                            in_complete_theory_1,
+                                            in_complete_theory_2,
+                                            out_complete_theory_1,
+                                            out_complete_theory_2)
+
+CompleteLabelingDIMACSParser = DIMACSParser(*complete_theories)

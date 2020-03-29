@@ -253,3 +253,17 @@ def outputEE(ext_list, suffix='\n'):
     sys.stdout.write(']')
     sys.stdout.write(suffix)
     sys.stdout.flush()
+
+
+def outputSolution(solution, task_type):
+
+    if task_type == 'EE':
+        return outputEE(solution)
+    elif task_type == 'SE':
+        return outputSE(solution)
+    elif task_type == 'DC':
+        return outputDC(solution)
+    elif task_type == 'DS':
+        return outputDS(solution)
+    else:
+        raise ValueError(F'task_type {task_type} is invalid!')

@@ -1,5 +1,7 @@
 import abc
-from typing import List
+from typing import List, Set
+
+import saf.utils as utils
 
 
 class FrameworkRepresentation(metaclass=abc.ABCMeta):
@@ -9,7 +11,6 @@ class FrameworkRepresentation(metaclass=abc.ABCMeta):
         self._values_to_arguments = arguments
         self._arguments_to_values = {arg: i for i,
                                      arg in enumerate(arguments, start=1)}
-        # TODO Probably a better way to do this? Populate as you convert?
         self._args = self.argumentsToValues(arguments)
         self._atts = [[self.argumentToValue(arg)
                        for arg in attack] for attack in attacks]
@@ -31,20 +32,26 @@ class FrameworkRepresentation(metaclass=abc.ABCMeta):
 
     @classmethod
     def __subclasshook__(cls, subclass):
-        return (hasattr(subclass, 'getAttackers') and
-                callable(subclass.getAttackers) and
+        return (hasattr(subclass, 'getAttackersOf') and
+                callable(subclass.getAttackersOf) and
                 hasattr(subclass, 'getAttackedBy') and
                 callable(subclass.getAttackedBy) and
+                hasattr(subclass, 'getAttackersOfSet') and
+                callable(subclass.getAttackersOfSet) and
+                hasattr(subclass, 'getAttackedBySet') and
+                callable(subclass.getAttackedBySet) and
                 hasattr(subclass, 'getArguments') and
                 callable(subclass.getArguments) and
-                hasattr(subclass, 'F') and
-                callable(subclass.F) and
+                hasattr(subclass, 'getAttacks') and
+                callable(subclass.getAttacks) and
+                hasattr(subclass, 'characteristic') and
+                callable(subclass.characteristic) and
                 hasattr(subclass, '__len__') and
                 callable(subclass.__len__) or
                 NotImplemented)
 
     @abc.abstractmethod
-    def getAttackers(self, arg: int) -> List[int]:
+    def getAttackersOf(self, arg: int) -> List[int]:
         """Get a list of all arguments which attack of a given argument."""
         raise NotImplementedError
 
@@ -65,7 +72,7 @@ class FrameworkRepresentation(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def F(argument_value: int) -> List[int]:
+    def characteristic(self, argument_values_set: Set[int]) -> Set[int]:
         """The characteristic function F of the framework."""
         raise NotImplementedError
 
@@ -84,16 +91,16 @@ class ListGraphFramework(FrameworkRepresentation):
         """Construct the framework from parsed and validated data.
         Where arguments is a list of named/numbered arguments."""
         super().__init__(arguments, attacks)
-        self._node_list = [([], []) for _ in range(len(self._args))]
+        self._node_list = [(set(), set()) for _ in range(len(self._args))]
         # TODO generalise the == to is?
         for (attacker, attacked) in self._atts:
-            self._node_list[attacker-1][0].append(attacked)
-            self._node_list[attacked-1][1].append(attacker)
+            self._node_list[attacker - 1][0].add(attacked)
+            self._node_list[attacked - 1][1].add(attacker)
 
-        self.len = len(self._node_list)
+        self.LENGTH = len(self._node_list)
 
     def __len__(self):
-        return self.len
+        return self.LENGTH
 
     def __str__(self):
         retStr = ""
@@ -113,22 +120,70 @@ class ListGraphFramework(FrameworkRepresentation):
             )
         return retStr
 
-    @staticmethod
-    def _indexOf(arg):
-        return arg - 1
+    def characteristic(self, argument_values):
+        # ? Maybe use binary representations of the sets of arguments to
+        # ? compair?
 
-    def F(self, argument_value: int) -> List[int]:
-        # TODO Implement the characteristic function
-        pass
+        # * Can use lookups in self._att? One by one instead
+        # * of computing sets...
+
+        # {B | ∃C ∈ Args. C attacks B}
+        attacked_by_args = self.getAttackedBySet(argument_values)
+
+        return {arg for arg in self
+                if self.getAttackersOf(arg).issubset(attacked_by_args)}
+
+    @staticmethod
+    def _indexOf(arg_value):
+        return arg_value - 1
 
     def getAttackedBy(self, arg):
         return self._node_list[self._indexOf(arg)][0]
 
-    def getAttackers(self, arg):
+    def getAttackersOf(self, arg):
         return self._node_list[self._indexOf(arg)][1]
+
+    def getAttackedBySet(self, arg_set):
+        return utils.flattenSet([self.getAttackedBy(arg) for arg in arg_set])
+
+    def getAttackersOfSet(self, arg_set):
+        return utils.flattenSet([self.getAttackersOf(arg) for arg in arg_set])
 
     def getArguments(self):
         return self._args
 
     def getAttacks(self):
         return self._atts
+
+
+def extensionToInt(extension):
+    rep = 0
+    for arg in extension:
+        rep += 2**(arg-1)
+    return rep
+
+
+def isIncluded(extension, other):
+    ext_rep = extensionToInt(extension)
+    other_rep = extensionToInt(other)
+
+    if ext_rep > other_rep:
+        return False
+
+    return other_rep & ext_rep == ext_rep
+
+
+def getMinimal(extensions):
+    extensions.sort(key=len)
+    for ext in extensions:
+        if all((isIncluded(ext, other) for other in extensions)):
+            return ext
+
+
+def getMaximal(extensions):
+    maximal = []
+    extensions.sort(reverse=True, key=len)
+    for ext in extensions:
+        if all((isIncluded(other, ext) for other in extensions)):
+            maximal.append(ext)
+    return maximal
