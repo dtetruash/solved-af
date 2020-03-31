@@ -157,6 +157,7 @@ class ListGraphFramework(FrameworkRepresentation):
 
 
 def extensionToInt(extension):
+    # ? Maybe add caching?
     rep = 0
     for arg in extension:
         rep += 2**(arg-1)
@@ -180,10 +181,11 @@ def getMinimal(extensions):
             return ext
 
 
-def getMaximal(extensions):
-    maximal = []
-    extensions.sort(reverse=True, key=len)
+def generateMaximal(extensions):
+    # extensions.sort(reverse=True, key=len)
+    # FIXME Check if a maximal extension can be compared with itself...
+    # FIXME !! Generators don't mix well with nester for loops...
+    extensions = list(extensions)
     for ext in extensions:
-        if all((isIncluded(other, ext) for other in extensions)):
-            maximal.append(ext)
-    return maximal
+        if all([isIncluded(other, ext) for other in extensions]):
+            yield ext

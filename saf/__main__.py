@@ -51,7 +51,7 @@ def main():
     if args.argument is None:
         taskMethod = tasks.getTaskMethod(task_name, is_enumeration=True)
         solution = taskMethod(af)
-        if task_type == 'SE':
+        if task_type == 'SE' and solution:
             parsed_solution = af.valuesToArguments(solution)
         elif task_type == 'EE':
             parsed_solution = [af.valuesToArguments(ext) for ext in solution]

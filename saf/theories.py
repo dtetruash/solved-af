@@ -4,8 +4,6 @@ from typing import List, Callable, Generator, NewType
 from saf.framework import FrameworkRepresentation as Framework
 
 
-# TODO add caching to the variables generated
-
 def _calculateLabelVar(arg_value: int, num_of_labels, label=Label.In) -> int:
     return num_of_labels * (arg_value - 1) + label
 
@@ -140,7 +138,7 @@ class DIMACSInput:
     def __str__(self):
         return str(self._header) + self._content
 
-    def addClause(self, dimacs_clause: str):
+    def addSingleClause(self, dimacs_clause: str):
         self._content += dimacs_clause
         self._header.incrementClauses()
 
@@ -157,17 +155,21 @@ class DIMACSParser(TheoryParser):
     def __init__(self, *theories: CNFTheory):
         super().__init__(*theories)
 
-    def parseCNFTheory(self, theory: CNFTheory):
-        clauses = [' '.join(str(x) for x in clause) +
-                   ' 0' for clause in theory]
+    @classmethod
+    def parseCNFTheory(cls, theory: CNFTheory):
+        clauses = [cls.parseClause(clause) for clause in theory]
         return '\n'.join(clauses) + '\n'
+
+    @staticmethod
+    def parseClause(clause: List[int]):
+        return ' '.join(str(lab_var) for lab_var in clause) + ' 0'
 
     def parse(self, framework: Framework) -> DIMACSInput:
         # generate all theories in raw form,
         # count the number of clauses generated...
 
         raw_clauses = []
-        # For each argument there is bool variable for each label
+        # For each argument there is a bool variable for each label
         # describing it.
         num_of_vars = len(framework) * len(Label)
         argument_values = framework.getArguments()
@@ -180,19 +182,23 @@ class DIMACSParser(TheoryParser):
         return DIMACSInput(num_of_vars, num_of_clauses, dimacs_content)
 
     @staticmethod
-    def extractExtention(sat_output: str) -> List[int]:
-        model = [int(lab_var.strip())
-                 for lab_var in sat_output.split(' ')[1:-1]]
-        return[labelVarToArg(lab_var, 3) for lab_var in model
-               if lab_var > 0 and abs(lab_var)
-               in range(1, len(model), len(Label))]
+    def extractExtention(assignment: List[int]) -> List[int]:
+        # FIXME need a better way to check for being an in-label var.
+        in_labels = set(range(1, len(assignment), len(Label)))
 
-    # FIXME Method doesn't tell what the labeling is.
+        extension = set()
+
+        for lab_var in assignment:
+            if abs(lab_var) in in_labels and lab_var > 0:
+                extension.add(labelVarToArg(lab_var, len(Label)))
+        return extension
+
+        # return [labelVarToArg(lab_var, len(Label)) for lab_var in assignment
+        #         if abs(lab_var) in in_labels and lab_var > 0]
+
     @staticmethod
-    def extractLabeling(sat_output: str) -> List[int]:
-        # FIXME Convert to list comprehension instead
-        return list(filter(lambda x: x > 0, [int(lab_var) for lab_var
-                                             in sat_output.split(' ')[1:-1]]))
+    def extractPositiveLiterals(assignment: List[int]) -> List[int]:
+        return [lab_var for lab_var in assignment if lab_var > 0]
 
 
 """

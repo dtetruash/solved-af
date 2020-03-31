@@ -1,59 +1,132 @@
+import errno
+import subprocess
 import sys
+
+from saf.framework import generateMaximal
 from saf.theories import CompleteLabelingDIMACSParser as CLDIMACSParser
 from saf.theories import DIMACSParser
-from subprocess import run, PIPE
-# from saf.framework import getMinimal, getMaximal
 
 SAT_COMMAND = ['glucose', '-model', '-verb=0']
+UNSAT_CODE = 20
 
 
-def CompleteEnumeration(framework):
-    theory_parser = CLDIMACSParser
-
-    sat_input = theory_parser.parse(framework)
-
-    extentions = []
-    extension_values_list = []
-    unsatisfiable = False
-    while not unsatisfiable:
-        """TODO Use input buffers and Popen() to write to the buffer
+def runSATSolver(encoded_sat_input):
+    """TODO Use input buffers and Popen() to write to the buffer
         stream directly"""
-        sat_solver_proccess = run(SAT_COMMAND, stdout=PIPE,
-                                  input=sat_input.encode(), encoding='ascii')
-        # TODO Encapsulate
-        # TODO maybe try extracting the solution universally via regex
-        solution = sat_solver_proccess.stdout.split('\n')[-2]
-        unsatisfiable = sat_solver_proccess.returncode == 20
-        if not unsatisfiable:
-            extension_values = DIMACSParser.extractExtention(solution)
-            extension_values_list.append(extension_values)
-            extension = framework.valuesToArguments(extension_values)
-            extentions.append(extension)
-            # TODO Encapsulate in a method
-            solution_labeling = DIMACSParser.extractLabeling(solution)
-            solution_negation_clause = [[str(-lab_var) for lab_var
-                                         in solution_labeling]]
-            solution_negation_dimacs = theory_parser.parseCNFTheory(
-                solution_negation_clause)
-            sat_input.addClause(solution_negation_dimacs)
-    return extentions
-
-    # # Minimal extension TEST
-    # minimal_extention_values = getMinimal(extension_values_list)
-    # minimal_extension = framework.valuesToArguments(minimal_extention_values)
-    # print('the minimal extension is: ')
-    # saf.io.outputSE(minimal_extension)
-
-    # # maximal extension TEST
-    # maximal_extensions = [framework.valuesToArguments(
-    #     maximal_extention_values) for maximal_extention_values
-    #     in getMaximal(extension_values_list)]
-    # print('the maximal extensions are: ')
-    # saf.io.outputEE(maximal_extensions)
+    try:
+        return subprocess.run(SAT_COMMAND, stdout=subprocess.PIPE,
+                              input=encoded_sat_input, encoding='ascii')
+        # return subprocess.Popen(SAT_COMMAND,
+        #                         stdout=subprocess.PIPE,
+        #                         stdin=subprocess.PIPE)
+    except OSError as e:
+        # see if solver is installed
+        if e.errno == errno.ENOENT:
+            solver_name = SAT_COMMAND[0]
+            sys.stderr.write(
+                (
+                    F'command not found: \'{solver_name}\'\n\n'
+                    F'\'{solver_name}\' is a dependency of {sys.argv[0]}.\n'
+                    F'Please make sure \'{solver_name}\' is executable '
+                    'and is in your PATH.'
+                )
+            )
+        else:
+            # TODO Get the program name from setuptools
+            # TODO instead of sys.argv[0]
+            sys.stderr.write(
+                (F'{sys.argv[0]} encountered an internal error.'
+                 F'The SAT solver command \'{" ".join(SAT_COMMAND)}\' '
+                 F'has failed with return code {e.returncode}.')
+            )
+        sys.stderr.flush()
+        sys.exit(e.errno)
 
 
-def GroundedSingleEnumeration(framework):
-    # U_{1..inf} Fi([])
+def negateClause(clause):
+    return [-lab_var for lab_var in clause]
+
+
+def extractAssignment(raw_dimacs_output):
+    # TODO Find the line which starts with 'v' explicitly,
+    # TODO raise error if not found
+    assignment_line = raw_dimacs_output.split('\n')[-2]
+    # Get a list of strings from the assignment line exclusing the
+    # beginning 'v' and the concluding '0' converted to ints
+    return [int(lab_var) for lab_var in assignment_line.split()[1:-1]]
+
+
+def excludeAssignment(solution, sat_input):
+    # TODO Extract methods from DIMACS parser
+    positive_literals = DIMACSParser.extractPositiveLiterals(solution)
+    negation_clause = negateClause(positive_literals)
+    negation_dimacs = CLDIMACSParser.parseClause(negation_clause)
+    sat_input.addSingleClause(negation_dimacs)
+
+
+def singleEnumeration(framework, reduction_parser):
+    sat_input = reduction_parser.parse(framework)
+
+    solver = runSATSolver(sat_input.encode())
+
+    if solver.returncode == UNSAT_CODE:
+        return None
+
+    assignment = extractAssignment(solver.stdout)
+
+    extension = DIMACSParser.extractExtention(assignment)
+
+    return extension
+
+
+def fullEnumeration(framework, reduction_parser):
+    sat_input = reduction_parser.parse(framework)
+
+    while True:
+        solver = runSATSolver(sat_input.encode())
+
+        if solver.returncode == UNSAT_CODE:
+            break
+
+        assignment = extractAssignment(solver.stdout)
+        extension = DIMACSParser.extractExtention(assignment)
+        excludeAssignment(assignment, sat_input)
+
+        yield extension
+
+
+def credulousDecision(framework, argument_value, enumeration_function):
+    # TODO Test whether it is faster to use 'isIncluded' here.
+    # TODO needs to be lazy, i.e. check after each extension is generated.
+    return any(argument_value in extension
+               for extension in enumeration_function(framework))
+
+
+def skepticalDecision(framework, argument_value, enumeration_function):
+    return all(argument_value in extension
+               for extension in enumeration_function(framework))
+
+
+def completeFullEnumeration(framework):
+    return fullEnumeration(framework, CLDIMACSParser)
+
+
+def completeSingleEnumeration(framework):
+    return singleEnumeration(framework, CLDIMACSParser)
+
+
+def completeCredulousDecision(framework, argument_value):
+    return credulousDecision(framework, argument_value,
+                             completeFullEnumeration)
+
+
+def completeSkepticalDecision(framework, argument_value):
+    return skepticalDecision(framework, argument_value,
+                             completeFullEnumeration)
+
+
+def groundedSingleEnumeration(framework):
+    # U_{1..inf} F^i({})
     grounded_extension = set()
     curr_characteristic = set()
 
@@ -73,42 +146,65 @@ def GroundedSingleEnumeration(framework):
     return grounded_extension
 
 
-def GroundedCredulousDecision(framework, argument_value):
-    return argument_value in GroundedSingleEnumeration(framework)
+def groundedCredulousDecision(framework, argument_value):
+    return argument_value in groundedSingleEnumeration(framework)
+
+
+def preferredFullEnumeration(framework):
+    complete_extensions = completeFullEnumeration(framework)
+
+    return generateMaximal(complete_extensions)
+
+
+def preferredSingleEnumeration(framework):
+    try:
+        return next(preferredFullEnumeration(framework))
+    except StopIteration:
+        return None
+
+
+def preferredCredulousDecision(framework, argument_value):
+    credulousDecision(framework, argument_value,
+                      preferredFullEnumeration)
+
+
+def preferredSkepticalDecision(framework, argument_value):
+    skepticalDecision(framework, argument_value,
+                      preferredFullEnumeration)
 
 
 _enumerationTasksFunctions = {
     # Complete semantics`
-    'EE-CO': CompleteEnumeration,
-    # 'SE-CO': CompleteSingleEnumeration,
+    'EE-CO': completeFullEnumeration,
+    'SE-CO': completeSingleEnumeration,
 
     # Grounded semantics
-    'SE-GR': GroundedSingleEnumeration
+    'SE-GR': groundedSingleEnumeration,
 
     # Preferred semantics
-    # 'EE-PR': PreferredEnumeration,
-    # 'SE-PR': PreferredSingleEnumeration,
+    'EE-PR': preferredFullEnumeration,
+    'SE-PR': preferredSingleEnumeration,
 
     # Stable semantics
-    # 'EE-ST': StableEnumeration,
-    # 'SE-ST': StableSingleEnumeration
+    # 'EE-ST': stableFullEnumeration,
+    # 'SE-ST': stableSingleEnumeration
 }
 
 _decisionTaskFunctions = {
     # Complete semantics
-    # 'DC-CO': CompleteCredulousDecision,
-    # 'DS-CO': CompleteSkepticalDecision,
+    'DC-CO': completeCredulousDecision,
+    'DS-CO': completeSkepticalDecision,
 
     # Grounded semantics
-    'DC-GR': GroundedCredulousDecision,
+    'DC-GR': groundedCredulousDecision,
 
     # Preferred semantics
-    # 'DC-PR': PreferredCredulousDecision,
-    # 'DS-PR': PreferredSkepticalDecision,
+    'DC-PR': preferredCredulousDecision,
+    'DS-PR': preferredSkepticalDecision,
 
     # Stable semantics
-    # 'DC-ST': StableCredulousDecision,
-    # 'DS-ST': StableSkepticalDecision
+    # 'DC-ST': stableCredulousDecision,
+    # 'DS-ST': stableSkepticalDecision
 }
 
 
