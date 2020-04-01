@@ -224,8 +224,8 @@ def parseArguments():
     return args
 
 
-def outputExtension(ext, sep=',', prefix='', suffix='\n'):
-    sys.stdout.write(F'{prefix}[{sep.join(ext)}]{suffix}')
+def formatExtension(ext, sep=',', prefix='', suffix=''):
+    return F'{prefix}[{sep.join(ext)}]{suffix}'
 
 
 def outputDecision(accepted, suffix='\n'):
@@ -238,32 +238,30 @@ outputDC = outputDS = outputDecision
 
 
 def outputSE(ext, suffix='\n'):
-    sys.stdout.write('NO') if ext is None else outputExtension(ext)
+    sys.stdout.write('NO') if ext is None \
+        else sys.stdout.write(formatExtension(ext))
     sys.stdout.write(suffix)
     sys.stdout.flush()
 
-# ! FIXME Might be better to have a single print function and multiple
-# ! formatting functions
 
-
-def outputEE(ext_list, suffix='\n'):
-    sys.stdout.write('[\n')
-    for ext in ext_list:
-        outputExtension(ext, prefix='\t')
+def outputEE(ext_list, sep=',', suffix='\n'):
+    sys.stdout.write('[')
+    sys.stdout.write(sep.join([formatExtension(ext) for ext in ext_list]))
     sys.stdout.write(']')
     sys.stdout.write(suffix)
     sys.stdout.flush()
 
 
-def outputSolution(solution, task_type):
+_outputFunctions = {'EE': outputEE,
+                    'SE': outputSE,
+                    'DC': outputDC,
+                    'DS': outputDS}
 
-    if task_type == 'EE':
-        return outputEE(solution)
-    elif task_type == 'SE':
-        return outputSE(solution)
-    elif task_type == 'DC':
-        return outputDC(solution)
-    elif task_type == 'DS':
-        return outputDS(solution)
-    else:
-        raise ValueError(F'task_type {task_type} is invalid!')
+
+def outputSolution(solution, task_type):
+    try:
+        _outputFunctions.get(task_type)(solution)
+    except KeyError:
+        sys.stderr.write(F'Task_type {task_type} is invalid!')
+        sys.stderr.flush()
+        sys.exit(1)
