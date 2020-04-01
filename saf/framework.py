@@ -168,6 +168,9 @@ def isIncluded(extension, other):
     ext_rep = extensionToInt(extension)
     other_rep = extensionToInt(other)
 
+    # ext_rep_b = bin(ext_rep)
+    # other_rep_b = bin(other_rep)
+
     if ext_rep > other_rep:
         return False
 
@@ -182,10 +185,11 @@ def getMinimal(extensions):
 
 
 def generateMaximal(extensions):
-    # extensions.sort(reverse=True, key=len)
-    # FIXME Check if a maximal extension can be compared with itself...
-    # FIXME !! Generators don't mix well with nester for loops...
     extensions = list(extensions)
     for ext in extensions:
-        if all([isIncluded(other, ext) for other in extensions]):
+
+        others = extensions[:]
+        others.remove(ext)
+
+        if all(not isIncluded(ext, other) for other in others):
             yield ext
