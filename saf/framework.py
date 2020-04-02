@@ -92,7 +92,6 @@ class ListGraphFramework(FrameworkRepresentation):
         Where arguments is a list of named/numbered arguments."""
         super().__init__(arguments, attacks)
         self._node_list = [(set(), set()) for _ in range(len(self._args))]
-        # TODO generalise the == to is?
         for (attacker, attacked) in self._atts:
             self._node_list[attacker - 1][0].add(attacked)
             self._node_list[attacked - 1][1].add(attacker)
@@ -156,8 +155,8 @@ class ListGraphFramework(FrameworkRepresentation):
         return self._atts
 
 
+@utils.memoize
 def extensionToInt(extension):
-    # ? Maybe add caching?
     rep = 0
     for arg in extension:
         rep += 2**(arg-1)
@@ -167,9 +166,6 @@ def extensionToInt(extension):
 def isIncluded(extension, other):
     ext_rep = extensionToInt(extension)
     other_rep = extensionToInt(other)
-
-    # ext_rep_b = bin(ext_rep)
-    # other_rep_b = bin(other_rep)
 
     if ext_rep > other_rep:
         return False
@@ -188,6 +184,8 @@ def generateMaximal(extensions):
     extensions = list(extensions)
     for ext in extensions:
 
+        # FIXME Might be faster to use a list comprehension or other
+        # way of iterating over only those which are not itself.
         others = extensions[:]
         others.remove(ext)
 

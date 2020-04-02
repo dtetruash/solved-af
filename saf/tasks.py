@@ -3,8 +3,8 @@ import subprocess
 import sys
 
 from saf.framework import generateMaximal
-from saf.theories import CompleteLabelingDIMACSParser as CLDIMACSParser
 from saf.theories import DIMACSParser
+from saf.theories import completeLabelingParser, stableLabellingParser
 
 SAT_COMMAND = ['glucose', '-model', '-verb=0']
 UNSAT_CODE = 20
@@ -60,7 +60,7 @@ def excludeAssignment(solution, sat_input):
     # TODO Extract methods from DIMACS parser
     positive_literals = DIMACSParser.extractPositiveLiterals(solution)
     negation_clause = negateClause(positive_literals)
-    negation_dimacs = CLDIMACSParser.parseClause(negation_clause)
+    negation_dimacs = DIMACSParser.parseClause(negation_clause)
     sat_input.addSingleClause(negation_dimacs)
 
 
@@ -107,22 +107,9 @@ def skepticalDecision(framework, argument_value, enumeration_function):
                for extension in enumeration_function(framework))
 
 
-def completeFullEnumeration(framework):
-    return fullEnumeration(framework, CLDIMACSParser)
-
-
-def completeSingleEnumeration(framework):
-    return singleEnumeration(framework, CLDIMACSParser)
-
-
-def completeCredulousDecision(framework, argument_value):
-    return credulousDecision(framework, argument_value,
-                             completeFullEnumeration)
-
-
-def completeSkepticalDecision(framework, argument_value):
-    return skepticalDecision(framework, argument_value,
-                             completeFullEnumeration)
+"""
+Concrete task implementations.
+"""
 
 
 def groundedSingleEnumeration(framework):
@@ -147,7 +134,29 @@ def groundedSingleEnumeration(framework):
 
 
 def groundedCredulousDecision(framework, argument_value):
+    # ! groundedCredulousDecision could be optimised further if the
+    # ! extension would be constructed iteratively and the check would
+    # ! be made at each iteration against the new additions.
+
     return argument_value in groundedSingleEnumeration(framework)
+
+
+def completeFullEnumeration(framework):
+    return fullEnumeration(framework, completeLabelingParser)
+
+
+def completeSingleEnumeration(framework):
+    return singleEnumeration(framework, completeLabelingParser)
+
+
+def completeCredulousDecision(framework, argument_value):
+    return credulousDecision(framework, argument_value,
+                             completeFullEnumeration)
+
+
+def completeSkepticalDecision(framework, argument_value):
+    return skepticalDecision(framework, argument_value,
+                             completeFullEnumeration)
 
 
 def preferredFullEnumeration(framework):
@@ -164,13 +173,31 @@ def preferredSingleEnumeration(framework):
 
 
 def preferredCredulousDecision(framework, argument_value):
-    credulousDecision(framework, argument_value,
-                      preferredFullEnumeration)
+    return credulousDecision(framework, argument_value,
+                             preferredFullEnumeration)
 
 
 def preferredSkepticalDecision(framework, argument_value):
-    skepticalDecision(framework, argument_value,
-                      preferredFullEnumeration)
+    return skepticalDecision(framework, argument_value,
+                             preferredFullEnumeration)
+
+
+def stableFullEnumeration(framework):
+    return fullEnumeration(framework, stableLabellingParser)
+
+
+def stableSingleEnumeration(framework):
+    return singleEnumeration(framework, stableLabellingParser)
+
+
+def stableCredulousDecision(framework, argument_value):
+    return credulousDecision(framework, argument_value,
+                             stableFullEnumeration)
+
+
+def stableSkepticalDecision(framework, argument_value):
+    return skepticalDecision(framework, argument_value,
+                             stableFullEnumeration)
 
 
 _enumerationTasksFunctions = {
@@ -186,8 +213,8 @@ _enumerationTasksFunctions = {
     'SE-PR': preferredSingleEnumeration,
 
     # Stable semantics
-    # 'EE-ST': stableFullEnumeration,
-    # 'SE-ST': stableSingleEnumeration
+    'EE-ST': stableFullEnumeration,
+    'SE-ST': stableSingleEnumeration
 }
 
 _decisionTaskFunctions = {
@@ -203,8 +230,8 @@ _decisionTaskFunctions = {
     'DS-PR': preferredSkepticalDecision,
 
     # Stable semantics
-    # 'DC-ST': stableCredulousDecision,
-    # 'DS-ST': stableSkepticalDecision
+    'DC-ST': stableCredulousDecision,
+    'DS-ST': stableSkepticalDecision
 }
 
 

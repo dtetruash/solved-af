@@ -1,6 +1,8 @@
 import abc
+from typing import Callable, FrozenSet, Generator, List, NewType
+
+import saf.utils as utils
 from saf.argument import Label
-from typing import List, Callable, Generator, NewType
 from saf.framework import FrameworkRepresentation as Framework
 
 
@@ -12,31 +14,19 @@ def labelVarToArg(label_var: int, num_of_labels) -> float:
     return (label_var // num_of_labels) + 1
 
 
-_label_var_cache = {}
-
-
-def _argToLabelVar(arg_value: int, label=Label.In) -> int:
-    label_key = (int(label), arg_value)
-    try:
-        ret_val = _label_var_cache[label_key]
-    except KeyError:
-        label_var = _calculateLabelVar(arg_value, 3, label)
-        _label_var_cache[label_key] = label_var
-        ret_val = label_var
-
-    return ret_val
-
-
+@utils.memoize
 def inLabelVariable(arg_value: int) -> int:
-    return _argToLabelVar(arg_value, Label.In)
+    return _calculateLabelVar(arg_value, 3, Label.In)
 
 
+@utils.memoize
 def outLabelVariable(arg_value: int) -> int:
-    return _argToLabelVar(arg_value, Label.Out)
+    return _calculateLabelVar(arg_value, 3, Label.Out)
 
 
+@utils.memoize
 def undLabelVariable(arg_value: int) -> int:
-    return _argToLabelVar(arg_value, Label.Und)
+    return _calculateLabelVar(arg_value, 3, Label.Und)
 
 
 inLab = inLabelVariable
@@ -182,16 +172,16 @@ class DIMACSParser(TheoryParser):
         return DIMACSInput(num_of_vars, num_of_clauses, dimacs_content)
 
     @staticmethod
-    def extractExtention(assignment: List[int]) -> List[int]:
+    def extractExtention(assignment: List[int]) -> FrozenSet[int]:
         # FIXME need a better way to check for being an in-label var.
         in_labels = set(range(1, len(assignment), len(Label)))
 
-        extension = set()
+        extension = []
 
         for lab_var in assignment:
             if abs(lab_var) in in_labels and lab_var > 0:
-                extension.add(labelVarToArg(lab_var, len(Label)))
-        return extension
+                extension.append(labelVarToArg(lab_var, len(Label)))
+        return frozenset(extension)
 
         # return [labelVarToArg(lab_var, len(Label)) for lab_var in assignment
         #         if abs(lab_var) in in_labels and lab_var > 0]
@@ -210,36 +200,72 @@ encoding into theories and the framework {f} containing said argument.
 """
 
 
-def uniqueness_theory(a, _): return [[inLab(a), outLab(a), undLab(a)],
-                                     [-inLab(a), -outLab(a)],
-                                     [-inLab(a), -undLab(a)],
-                                     [-outLab(a), -undLab(a)]]
+def uniqueness_theory(a, _):
+    return [[inLab(a), outLab(a), undLab(a)],
+            [-inLab(a), -outLab(a)],
+            [-inLab(a), -undLab(a)],
+            [-outLab(a), -undLab(a)]]
 
 
-def in_complete_theory_1(a, f): return [[-outLab(attacker)
-                                         for attacker in f.getAttackersOf(a)]
-                                        + [inLab(a)]]
+def complete_in_theory_1(a, f):
+    return [[-outLab(attacker)
+             for attacker in f.getAttackersOf(a)]
+            + [inLab(a)]]
 
 
-def in_complete_theory_2(a, f): return [[-inLab(a), outLab(attacked)]
-                                        for attacked in f.getAttackedBy(a)]
+def complete_in_theory_2(a, f):
+    return [[-inLab(a), outLab(attacked)]
+            for attacked in f.getAttackedBy(a)]
 
 
-def out_complete_theory_1(a, f): return [[-inLab(attacker), outLab(a)]
-                                         for attacker in f.getAttackersOf(a)]
+def complete_out_theory_1(a, f):
+    return [[-inLab(attacker), outLab(a)]
+            for attacker in f.getAttackersOf(a)]
 
 
-def out_complete_theory_2(a, f): return [[inLab(attacker)
-                                          for attacker in f.getAttackersOf(a)]
-                                         + [-outLab(a)]]
+def complete_out_theory_2(a, f):
+    return [[inLab(attacker)
+             for attacker in f.getAttackersOf(a)]
+            + [-outLab(a)]]
 
 
 # A parser instance for encoding complete extentions
 
 complete_theories = CNFTheory.fromTemplates(uniqueness_theory,
-                                            in_complete_theory_1,
-                                            in_complete_theory_2,
-                                            out_complete_theory_1,
-                                            out_complete_theory_2)
+                                            complete_in_theory_1,
+                                            complete_in_theory_2,
+                                            complete_out_theory_1,
+                                            complete_out_theory_2)
 
-CompleteLabelingDIMACSParser = DIMACSParser(*complete_theories)
+completeLabelingParser = DIMACSParser(*complete_theories)
+
+
+"""
+Theory model functions for encoding a full AF for the stable
+extensions.
+
+Each theory encoding functions take in the argument {a} they are
+encoding into theories and the framework {f} containing said argument.
+"""
+
+
+def stable_uniqueness_theory(a, _):
+    return [[inLab(a), outLab(a)],
+            [-inLab(a), -outLab(a)]]
+
+
+def stable_in_theory(a, f):
+    clause = [inLab(attacker) for attacker in f.getAttackersOf(a)]
+    clause.append(inLab(a))
+    return [clause]
+
+
+def stable_out_theory(a, f):
+    return [[outLab(attacker), outLab(a)] for attacker in f.getAttackersOf(a)]
+
+
+stable_theories = CNFTheory.fromTemplates(stable_uniqueness_theory,
+                                          stable_in_theory,
+                                          stable_out_theory)
+
+stableLabellingParser = DIMACSParser(*stable_theories)
