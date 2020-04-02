@@ -1,12 +1,14 @@
-import saf.tasks as tasks
 import argparse
-import sys
 import re
+import sys
+
+import saf.tasks as tasks
 
 
 def _reportInvalidInputFileAndExit(message):
-    print(F'Invalid input file!')
-    print(message)
+    sys.stderr.write(F'Invalid input file!')
+    sys.stderr.write(message)
+    sys.stderr.flush()
     sys.exit(1)
 
 
@@ -34,47 +36,46 @@ def _validateArgument(argument, arguments):
             F'Argument "{argument}" is defiled more than once.')
 
 
-def _parseTGF(file_path, validate=False):
+def _parseTGF(file, validate=False):
 
     arguments = []
     attacks = []
 
-    with open(file_path, 'r') as i:
-        has_seen_pivot = False
+    has_seen_pivot = False
 
-        for line in i:
-            line = line.strip()
+    for line in file:
+        line = line.strip()
 
-            if not line:
-                # Skip empty or whitespace lines
-                continue
+        if not line:
+            # Skip empty or whitespace lines
+            continue
 
-            if not has_seen_pivot and '#' in line:
-                # check for #-pivot line
-                has_seen_pivot = True
-                continue
+        if not has_seen_pivot and '#' in line:
+            # check for #-pivot line
+            has_seen_pivot = True
+            continue
 
-            if not has_seen_pivot:
-                # Read an argument line
-                argument_name = line.strip()
+        if not has_seen_pivot:
+            # Read an argument line
+            argument_name = line.strip()
 
-                if validate:
-                    _validateArgument(argument_name, arguments)
+            if validate:
+                _validateArgument(argument_name, arguments)
 
-                arguments.append(argument_name)
+            arguments.append(argument_name)
 
-            elif validate and '#' in line:
-                _reportInvalidInputFileAndExit(
-                    'TGF file contains more than one "#".')
+        elif validate and '#' in line:
+            _reportInvalidInputFileAndExit(
+                'TGF file contains more than one "#".')
 
-            else:
-                # Read an attack line
-                attack = tuple(line.split())
+        else:
+            # Read an attack line
+            attack = tuple(line.split())
 
-                if validate:
-                    _validateAttack(attack, arguments, attacks, line)
+            if validate:
+                _validateAttack(attack, arguments, attacks, line)
 
-                attacks.append(tuple(attack))
+            attacks.append(tuple(attack))
 
         if validate and not has_seen_pivot:
             _reportInvalidInputFileAndExit(
@@ -83,42 +84,41 @@ def _parseTGF(file_path, validate=False):
     return arguments, attacks
 
 
-def _parseAPX(file_path, validate=False):
+def _parseAPX(file, validate=False):
     arguments = []
     attacks = []
     # https://git.io/Jv6wD - Taken from alviano/pyglaf implementation
     # TODO Make this pattern match 'att' and 'arg' respectively
     pattern = re.compile("(?P<type>\w+)\s*\((?P<args>[\w,\s]+)\)\.")
 
-    with open(file_path, 'r') as i:
-        for line in i:
-            resolved_line = pattern.match(line)
+    for line in file:
+        resolved_line = pattern.match(line)
 
-            if not resolved_line:
-                # Skip non apx lines
-                # ? Should this throw 'Invalid formatting' error?
-                continue
+        if not resolved_line:
+            # Skip non apx lines
+            # ? Should this throw 'Invalid formatting' error?
+            continue
 
-            line_type = resolved_line.group('type')
+        line_type = resolved_line.group('type')
 
-            if line_type == 'arg':
-                # Read argument line e.g. 'arg(...).'
-                argument_name = resolved_line.group('args')
+        if line_type == 'arg':
+            # Read argument line e.g. 'arg(...).'
+            argument_name = resolved_line.group('args')
 
-                if validate:
-                    _validateArgument(argument_name, arguments)
+            if validate:
+                _validateArgument(argument_name, arguments)
 
-                arguments.append(argument_name)
+            arguments.append(argument_name)
 
-            elif line_type == 'att':
-                # Read attack line e.g., 'att(...).'
-                attack_wws = resolved_line.group('args').split(',')
-                attack = [arg_name.strip() for arg_name in attack_wws]
+        elif line_type == 'att':
+            # Read attack line e.g., 'att(...).'
+            attack_wws = resolved_line.group('args').split(',')
+            attack = [arg_name.strip() for arg_name in attack_wws]
 
-                if validate:
-                    _validateAttack(attack, arguments, attacks, line.strip())
+            if validate:
+                _validateAttack(attack, arguments, attacks, line.strip())
 
-                attacks.append(attack)
+            attacks.append(attack)
 
     return arguments, attacks
 
@@ -136,30 +136,32 @@ def getFormats():
 def parseInput(file_path, format='tgf', validate=False):
     try:
         parsingFunction = _formats[format]
-        return parsingFunction(file_path, validate)
     except KeyError:
-        print(F'File format "{format}" is not supported!')
-        print('Use --formats to see the list of supported formats.')
+        sys.stderr.write(F'File format "{format}" is not supported!')
+        sys.stderr.write('Use --formats to see the list of supported formats.')
+        sys.stderr.flush()
         sys.exit(1)
-
-
-def _formatOutputFromList(str_list):
-    return F"[{', '.join(str_list)}]"
+    try:
+        with open(file_path, 'r') as file:
+            return parsingFunction(file, validate)
+    except OSError as e:
+        sys.stderr.write(e.strerror)
+        sys.stderr.flush()
+        sys.exit(1)
 
 
 class _FormatsAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        print(_formatOutputFromList(getFormats()))
+        print(formatOutput(getFormats(), sep=', '))
         sys.exit(0)
 
 
 class _ProblemsAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        print(_formatOutputFromList(tasks.getTasks()))
+        print(formatOutput(tasks.getTasks(), sep=', '))
         sys.exit(0)
 
 
-# TODO Move help to a constants file..?
 def _initialiseArgumentParser():
     parser = argparse.ArgumentParser()
     # Remove default argument group in the help message
@@ -188,6 +190,11 @@ def _initialiseArgumentParser():
                           help='Input file format')
 
     optional = parser.add_argument_group('optional arguments')
+    optional.add_argument('-a',
+                          '--argument',
+                          type=str,
+                          metavar='<argumentname>',
+                          help='Argument to check acceptance for')
     # Register the custom action to list supported formats
     parser.register('action', 'list_formats', _FormatsAction)
     optional.add_argument('--formats',
@@ -201,12 +208,6 @@ def _initialiseArgumentParser():
                           nargs=0,
                           action='list_problems',
                           help='List all supported problems and exit')
-
-    optional.add_argument('-a',
-                          '--argument',
-                          type=str,
-                          metavar='<argumentname>',
-                          help='Argument to check acceptance for')
 
     optional.add_argument('-v',
                           '--validate',
@@ -224,8 +225,8 @@ def parseArguments():
     return args
 
 
-def formatExtension(ext, sep=',', prefix='', suffix=''):
-    return F'{prefix}[{sep.join(ext)}]{suffix}'
+def formatOutput(output, sep=',', prefix='', suffix=''):
+    return F'{prefix}[{sep.join(output)}]{suffix}'
 
 
 def outputDecision(accepted, suffix='\n'):
@@ -239,14 +240,14 @@ outputDC = outputDS = outputDecision
 
 def outputSE(ext, suffix='\n'):
     sys.stdout.write('NO') if ext is None \
-        else sys.stdout.write(formatExtension(ext))
+        else sys.stdout.write(formatOutput(ext))
     sys.stdout.write(suffix)
     sys.stdout.flush()
 
 
 def outputEE(ext_list, sep=',', suffix='\n'):
     sys.stdout.write('[')
-    sys.stdout.write(sep.join([formatExtension(ext) for ext in ext_list]))
+    sys.stdout.write(sep.join([formatOutput(ext) for ext in ext_list]))
     sys.stdout.write(']')
     sys.stdout.write(suffix)
     sys.stdout.flush()
