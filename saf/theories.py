@@ -29,9 +29,22 @@ def undLabelVariable(arg_value: int) -> int:
     return _calculateLabelVar(arg_value, 3, Label.Und)
 
 
+@utils.memoize
+def stableInLabelVariable(arg_value: int) -> int:
+    return _calculateLabelVar(arg_value, 2, Label.In)
+
+
+@utils.memoize
+def stableOutLabelVariable(arg_value: int) -> int:
+    return _calculateLabelVar(arg_value, 2, Label.Out)
+
+
 inLab = inLabelVariable
 outLab = outLabelVariable
 undLab = undLabelVariable
+
+stbInLab = stableInLabelVariable
+stbOutLab = stableOutLabelVariable
 
 
 TheoryTemplate = NewType(
@@ -142,8 +155,9 @@ class DIMACSParser(TheoryParser):
     into a set of SAT theories.
     """
 
-    def __init__(self, *theories: CNFTheory):
+    def __init__(self, *theories: CNFTheory, vars_per_argument=len(Label)):
         super().__init__(*theories)
+        self.vars_per_argument = vars_per_argument
 
     @classmethod
     def parseCNFTheory(cls, theory: CNFTheory):
@@ -161,7 +175,7 @@ class DIMACSParser(TheoryParser):
         raw_clauses = []
         # For each argument there is a bool variable for each label
         # describing it.
-        num_of_vars = len(framework) * len(Label)
+        num_of_vars = len(framework) * self.vars_per_argument
         argument_values = framework.getArguments()
         for theory in self._theories:
             raw_clauses += theory.generateAll(argument_values, framework)
@@ -171,20 +185,19 @@ class DIMACSParser(TheoryParser):
 
         return DIMACSInput(num_of_vars, num_of_clauses, dimacs_content)
 
-    @staticmethod
-    def extractExtention(assignment: List[int]) -> FrozenSet[int]:
+    def extractExtention(self, assignment: List[int]) -> FrozenSet[int]:
         # FIXME need a better way to check for being an in-label var.
-        in_labels = set(range(1, len(assignment), len(Label)))
+        if self.vars_per_argument > 1:
+            in_labels = set(range(1, len(assignment), self.vars_per_argument))
 
-        extension = []
+            extension = []
 
-        for lab_var in assignment:
-            if abs(lab_var) in in_labels and lab_var > 0:
-                extension.append(labelVarToArg(lab_var, len(Label)))
-        return frozenset(extension)
-
-        # return [labelVarToArg(lab_var, len(Label)) for lab_var in assignment
-        #         if abs(lab_var) in in_labels and lab_var > 0]
+            for lab_var in assignment:
+                if abs(lab_var) in in_labels and lab_var > 0:
+                    extension.append(labelVarToArg(lab_var, len(Label)))
+            return frozenset(extension)
+        else:
+            return frozenset(self.extractPositiveLiterals(assignment))
 
     @staticmethod
     def extractPositiveLiterals(assignment: List[int]) -> List[int]:
@@ -249,23 +262,22 @@ encoding into theories and the framework {f} containing said argument.
 """
 
 
-def stable_uniqueness_theory(a, _):
-    return [[inLab(a), outLab(a)],
-            [-inLab(a), -outLab(a)]]
+# def stable_uniqueness_theory(a, _):
+#     return [[stbInLab(a), stbOutLab(a)],
+#             [-stbInLab(a), -stbOutLab(a)]]
 
 
 def stable_in_theory(a, f):
-    clause = [inLab(attacker) for attacker in f.getAttackersOf(a)]
-    clause.append(inLab(a))
+    clause = [attacker for attacker in f.getAttackersOf(a)]
+    clause.append(a)
     return [clause]
 
 
 def stable_out_theory(a, f):
-    return [[outLab(attacker), outLab(a)] for attacker in f.getAttackersOf(a)]
+    return [[-attacker, -a]
+            for attacker in f.getAttackersOf(a)]
 
 
-stable_theories = CNFTheory.fromTemplates(stable_uniqueness_theory,
-                                          stable_in_theory,
-                                          stable_out_theory)
+stable_theories = CNFTheory.fromTemplates(stable_in_theory, stable_out_theory)
 
-stableLabellingParser = DIMACSParser(*stable_theories)
+stableLabellingParser = DIMACSParser(*stable_theories, vars_per_argument=1)

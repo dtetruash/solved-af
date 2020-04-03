@@ -84,12 +84,11 @@ def fullEnumeration(framework, reduction_parser):
 
     while True:
         solver = runSATSolver(sat_input.encode())
-
         if solver.returncode == UNSAT_CODE:
             break
 
         assignment = extractAssignment(solver.stdout)
-        extension = DIMACSParser.extractExtention(assignment)
+        extension = reduction_parser.extractExtention(assignment)
         excludeAssignment(assignment, sat_input)
 
         yield extension
