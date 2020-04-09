@@ -23,7 +23,7 @@
                 "-fo",
                 "tgf",
                 "-p",
-                "EE-PR"
+                "EE-ST"
             ],
             "console": "integratedTerminal"
         },
