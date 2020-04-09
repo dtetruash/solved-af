@@ -2,7 +2,7 @@ import errno
 import subprocess
 import sys
 
-from saf.framework import generateMaximal
+from saf.framework import getAllMaximal
 from saf.theories import DIMACSParser
 from saf.theories import completeLabelingParser, stableLabellingParser
 
@@ -84,6 +84,7 @@ def fullEnumeration(framework, reduction_parser):
 
     while True:
         solver = runSATSolver(sat_input.encode())
+
         if solver.returncode == UNSAT_CODE:
             break
 
@@ -161,14 +162,18 @@ def completeSkepticalDecision(framework, argument_value):
 def preferredFullEnumeration(framework):
     complete_extensions = completeFullEnumeration(framework)
 
-    return generateMaximal(complete_extensions)
+    return getAllMaximal(complete_extensions)
 
 
 def preferredSingleEnumeration(framework):
     try:
-        return next(preferredFullEnumeration(framework))
-    except StopIteration:
+        return preferredFullEnumeration(framework).pop()
+    except KeyError:
         return None
+    # try:
+    #     return next(preferredFullEnumeration(framework))
+    # except StopIteration:
+    #     return None
 
 
 def preferredCredulousDecision(framework, argument_value):

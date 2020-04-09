@@ -173,21 +173,30 @@ def isIncluded(extension, other):
     return other_rep & ext_rep == ext_rep
 
 
-def getMinimal(extensions):
-    extensions.sort(key=len)
+# def getMinimal(extensions):
+#     extensions.sort(key=len)
+#     for ext in extensions:
+#         if all((isIncluded(ext, other) for other in extensions)):
+#             return ext
+
+
+def getAllMaximal(extensions):
+    currently_maximal = set()
+
     for ext in extensions:
-        if all((isIncluded(ext, other) for other in extensions)):
-            return ext
+        is_maximal = True
+        non_maximal = []
 
+        for other in currently_maximal:
+            if isIncluded(ext, other):
+                is_maximal = False
+                break
+            elif isIncluded(other, ext):
+                non_maximal.append(other)
 
-def generateMaximal(extensions):
-    extensions = list(extensions)
-    for ext in extensions:
+        currently_maximal.difference_update(non_maximal)
 
-        # FIXME Might be faster to use a list comprehension or other
-        # way of iterating over only those which are not itself.
-        others = extensions[:]
-        others.remove(ext)
+        if is_maximal:
+            currently_maximal.add(ext)
 
-        if all(not isIncluded(ext, other) for other in others):
-            yield ext
+    return currently_maximal
