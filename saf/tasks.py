@@ -6,7 +6,7 @@ from saf.framework import getAllMaximal
 from saf.theories import DIMACSParser
 from saf.theories import completeLabelingParser, stableLabellingParser
 
-SAT_COMMAND = ['glucose', '-model', '-verb=0']
+SAT_COMMAND = ['glucose-syrup', '-model', '-verb=0']
 UNSAT_CODE = 20
 
 
