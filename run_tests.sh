@@ -1,6 +1,7 @@
 #!/bin/bash
 
-if [ $# -eq 0 ]; then
+if [ $# -eq 0 ]
+then
     echo "usage: ./run_tests.sh solver-cmd inputs ref-solutions timeout memout problem-task[s]"
     exit 0
 fi
@@ -9,14 +10,20 @@ fi
 BASEDIR=$(dirname "$0")
 ORIGINALDIR=$(pwd)
 
+SOLVER=$1
+INPUTS=${2:-"inputs"}
+REFS=${3:-"reference-results"}
 TIMEOUT=${4:-300}
 MEMOUT=${5:-2048}
-SOLVER=$1
-REFS=${3:-"reference-results"}
-INPUTS=${2:-"inputs"}
 
 echo 'Making a output directory for' $(date)
 TEST_NAME=$(date +'%Y-%m-%d_%H-%M-%S-')$SOLVER
+
+if [ "$SOLVER" == "solved-af" ]
+then
+    TEST_NAME+="_$(git rev-parse HEAD | cut -c 1-8)"
+fi
+
 OUTDIR=$ORIGINALDIR"/tests"/$TEST_NAME
 BURNER=$OUTDIR/burner
 
@@ -61,7 +68,8 @@ do
 
 
 	IFS="="
-        while read -r name value; do
+        while read -r name value
+        do
             [[ "$name" =~ ^[[:space:]]*# ]] && continue
             echo -n $value >> $OUTFILE
             echo -n ',' >> $OUTFILE
