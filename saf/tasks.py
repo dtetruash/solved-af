@@ -7,18 +7,17 @@ from saf.theories import DIMACSParser
 from saf.theories import completeLabelingParser, stableLabellingParser
 
 SAT_COMMAND = ['glucose-syrup', '-model', '-verb=0']
-UNSAT_CODE = 20
+UNSAT_RET_CODE = 20
 
 
 def runSATSolver(encoded_sat_input):
     """TODO Use input buffers and Popen() to write to the buffer
         stream directly"""
     try:
-        return subprocess.run(SAT_COMMAND, stdout=subprocess.PIPE,
-                              input=encoded_sat_input, encoding='ascii')
-        # return subprocess.Popen(SAT_COMMAND,
-        #                         stdout=subprocess.PIPE,
-        #                         stdin=subprocess.PIPE)
+        solver = subprocess.run(SAT_COMMAND, stdout=subprocess.PIPE,
+                                input=encoded_sat_input, encoding='ascii')
+        return solver
+
     except OSError as e:
         # see if solver is installed
         if e.errno == errno.ENOENT:
@@ -32,15 +31,19 @@ def runSATSolver(encoded_sat_input):
                 )
             )
         else:
-            # TODO Get the program name from setuptools
-            # TODO instead of sys.argv[0]
-            sys.stderr.write(
-                (F'{sys.argv[0]} encountered an internal error.'
-                 F'The SAT solver command \'{" ".join(SAT_COMMAND)}\' '
-                 F'has failed with return code {e.returncode}.')
-            )
+            sys.stderr.write(F'{e.strerror}\n\n')
         sys.stderr.flush()
         sys.exit(e.errno)
+    except subprocess.CalledProcessError as e:
+        # TODO Get the program name from setuptools
+        # TODO instead of sys.argv[0]
+        sys.stderr.write(
+            (F'{sys.argv[0]} encountered an internal error.'
+             F'The SAT solver command \'{" ".join(SAT_COMMAND)}\' '
+             F'has failed with return code {e.returncode}.')
+        )
+        sys.stderr.flush()
+        sys.exit(1)
 
 
 def negateClause(clause):
@@ -69,7 +72,7 @@ def singleEnumeration(framework, reduction_parser):
 
     solver = runSATSolver(sat_input.encode())
 
-    if solver.returncode == UNSAT_CODE:
+    if solver.returncode == UNSAT_RET_CODE:
         return None
 
     assignment = extractAssignment(solver.stdout)
@@ -85,7 +88,7 @@ def fullEnumeration(framework, reduction_parser):
     while True:
         solver = runSATSolver(sat_input.encode())
 
-        if solver.returncode == UNSAT_CODE:
+        if solver.returncode == UNSAT_RET_CODE:
             break
 
         assignment = extractAssignment(solver.stdout)
@@ -117,7 +120,7 @@ def groundedSingleEnumeration(framework):
     grounded_extension = set()
     curr_characteristic = set()
 
-    # Currently this is an O(n^n) optation... as each call to
+    # Currently this is an O(n^n) operation... as each call to
     # framework.characteristic is O(n) and it may loop n+1 times...
     # ? Would filtering complete extensions be quicker?
 
