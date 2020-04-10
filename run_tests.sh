@@ -38,13 +38,15 @@ OUTFILE=$OUTDIR/test-results_$TEST_NAME.csv
 touch $OUTFILE
 
 touch $BURNER/log.txt
-
-HEADER='WCTIME,CPUTIME,USERTIME,SYSTEMTIME,CPUUSAGE,MAXVM,TIMEOUT,MEMOUT,'
+echo "Timeout is set for $TIMEOUT seconds, Memout is set for $MEMOUT MB" >> $OUTFILE
+HEADER='WCTIME,CPUTIME,USERTIME,SYSTEMTIME,CPUUSAGE,MAXVM,TIMEOUT,MEMOUT'
 echo 'TASK,FILE,'$HEADER'MATCH' >> $OUTFILE
 
-echo 'Running Tests...'
-
 PROBLEM_TASKS="${@:6}"
+
+echo 'Beginning Tests for '${PROBLEM_TASKS[@]}' on '$SOLVER'...'
+
+telegram-send --format markdown "*$(hostname)*: Beginning testing for * ${PROBLEM_TASKS[@]} * on $SOLVER!"
 
 for PROBLEM_TASK in ${PROBLEM_TASKS[@]};
 do
@@ -60,7 +62,7 @@ do
         echo -n $PROBLEM_FILE >> $OUTFILE
         echo -n ',' >> $OUTFILE
 
-        echo '> Running Test: ' $PROBLEM_TASK 'on ' $PROBLEM_FILE
+        echo '>>  Running Test: ' $PROBLEM_TASK 'on ' $PROBLEM_FILE
 
         runsolver -w $BURNER/watcher.txt -v $BURNER/varfile.txt -o $BURNER/solver.o -W $TIMEOUT --vsize-limit $MEMOUT $SOLVER -fo tgf -f $PROBLEM_FILE -p $PROBLEM_TASK
 
@@ -79,6 +81,8 @@ do
         MATCH=$(compare-exts-mpz "$BURNER"/solver.o "$REFS"/"$PROBLEM_FILE_NAME".apx-"$PROBLEM_TASK".out | tail -1)
 
         echo $MATCH >> $OUTFILE
+
+	echo "$MATCH"
 
     done
 
