@@ -74,7 +74,7 @@ def singleEnumeration(framework, reduction_parser):
 
     assignment = extractAssignment(solver.stdout)
 
-    extension = DIMACSParser.extractExtention(assignment)
+    extension = reduction_parser.extractExtention(assignment)
 
     return extension
 
