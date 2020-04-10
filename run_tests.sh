@@ -1,15 +1,22 @@
 #!/bin/bash
 
-IFS="="
+if [ $# -eq 0 ]; then
+    echo "usage: ./run_tests.sh solver-cmd inputs ref-solutions timeout memout problem-task[s]"
+    exit 0
+fi
+
 
 BASEDIR=$(dirname "$0")
 ORIGINALDIR=$(pwd)
 
-TIMEOUT=300
-MEMOUT=2048
+TIMEOUT=${4:-300}
+MEMOUT=${5:-2048}
+SOLVER=$1
+REFS=${3:-"reference-results"}
+INPUTS=${2:-"inputs"}
 
 echo 'Making a output directory for' $(date)
-TEST_NAME=$(date +'test_%Y-%m-%d_%H-%M-%S')
+TEST_NAME=$(date +'%Y-%m-%d_%H-%M-%S-')$SOLVER
 OUTDIR=$ORIGINALDIR"/tests"/$TEST_NAME
 BURNER=$OUTDIR/burner
 
@@ -23,21 +30,19 @@ mkdir -p $BURNER
 OUTFILE=$OUTDIR/test-results_$TEST_NAME.csv
 touch $OUTFILE
 
-touch $BURNER/saf-log.txt
-touch $BURNER/eqargsolver-log.txt
+touch $BURNER/log.txt
 
-echo ",,SAF,,,,,,,," >> $OUTFILE
 HEADER='WCTIME,CPUTIME,USERTIME,SYSTEMTIME,CPUUSAGE,MAXVM,TIMEOUT,MEMOUT,'
 echo 'TASK,FILE,'$HEADER'MATCH' >> $OUTFILE
 
-echo 'Running Enumeration Tests...'
+echo 'Running Tests...'
 
-PROBLEM_TASKS=('EE-CO')
+PROBLEM_TASKS="${@:6}"
 
 for PROBLEM_TASK in ${PROBLEM_TASKS[@]};
 do
 
-    for PROBLEM_FILE in $BASEDIR/inputs/*.tgf;
+    for PROBLEM_FILE in $BASEDIR/$INPUTS/*.tgf;
     do
         PROBLEM_FILE_NAME=$(basename -- "$PROBLEM_FILE")
         PROBLEM_FILE_NAME="${PROBLEM_FILE_NAME%.*}"
@@ -50,52 +55,29 @@ do
 
         echo '> Running Test: ' $PROBLEM_TASK 'on ' $PROBLEM_FILE
 
-        echo 'Runing SAF...'
+        runsolver -w $BURNER/watcher.txt -v $BURNER/varfile.txt -o $BURNER/solver.o -W $TIMEOUT --vsize-limit $MEMOUT $SOLVER -fo tgf -f $PROBLEM_FILE -p $PROBLEM_TASK
 
-        runsolver -w $BURNER/saf-watcher.txt -v $BURNER/saf-varfile.txt -o $BURNER/saf.o -W $TIMEOUT --vsize-limit $MEMOUT solved-af -fo tgf -f $PROBLEM_FILE -p $PROBLEM_TASK
+        cat $BURNER/watcher.txt >> $BURNER/log.txt
 
-        cat $BURNER/saf-watcher.txt >> $BURNER/saf-log.txt
 
-        echo 'SAF Finished!'
-
+	IFS="="
         while read -r name value; do
             [[ "$name" =~ ^[[:space:]]*# ]] && continue
             echo -n $value >> $OUTFILE
             echo -n ',' >> $OUTFILE
-        done < $BURNER/saf-varfile.txt
+        done < $BURNER/varfile.txt
+	unset IFS
 
-        # echo 'Runing EqArgSolve...'
-
-        # runsolver -w $BURNER/eqargsolver-watcher.txt -v $BURNER/eqargsolver-varfile.txt -o $BURNER/eqargsolver.o -W $TIMEOUT --vsize-limit $MEMOUT eqobj -fo tgf -f ./$PROBLEM_FILE -p $PROBLEM_TASK
-
-
-        # cat $BURNER/eqargsolver-watcher.txt >> $BURNER/eqargsolver-log.txt
-
-
-        # echo 'EqArgSolver Finished!'
-
-        # while read -r name value; do
-        #     [[ "$name" =~ ^[[:space:]]*# ]] && continue
-        #     echo -n $value >> $OUTFILE
-        #     echo -n ',' >> $OUTFILE
-        # done < $BURNER/eqargsolver-varfile.txt
-
-
-        MATCH=$(compare-exts-mpz $BURNER/saf.o ~/Downloads/reference-results/$PROBLEM_FILE_NAME.apx-$PROBLEM_TASK.out | tail -1)
+        MATCH=$(compare-exts-mpz "$BURNER"/solver.o "$REFS"/"$PROBLEM_FILE_NAME".apx-"$PROBLEM_TASK".out | tail -1)
 
         echo $MATCH >> $OUTFILE
 
-        #rm -f $BURNER/*
-
     done
 
-    telegram-send --format markdown "Problem task *$PROBLEM_TASK* completed!"
+    telegram-send --format markdown "*$(hostname)*: Problem task *$PROBLEM_TASK* completed!"
 
 done
 
-telegram-send --format markdown "*Test $(date +'%Y-%m-%d_%H-%M-%S') completed!*"
-#rm -rf $BURNER
-
-export SOLVED_AF_CURRENT_TASK=""
+telegram-send --format markdown "$(hostname): *Test $(date +'%Y-%m-%d_%H-%M-%S') completed!*"
 
 echo 'Tests Finished!'
