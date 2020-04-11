@@ -14,6 +14,6 @@ if [ $(ps aux | grep run_tests | wc -l) -eq 2 ]; then
 
     echo $MESSGAE
 
-    telegram-send --format markdown "$MESSGAE"
+    /home/david/anaconda3/bin/telegram-send --format markdown "$MESSGAE"
 fi
 
