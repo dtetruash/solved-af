@@ -10,7 +10,7 @@ if [ $(ps aux | grep run_tests | wc -l) -eq 2 ]; then
     NUMBER_COMPLETED=$(grep $CURRENT_TASK $TEST_FILE | wc -l)
     TOTAL_PROBLEMS=$(ls /home/david/saf/instances/*.tgf | wc -l)
 
-    MESSGAE="*Progress report:* _ ${CURRENT_TASK} _ ${NUMBER_COMPLETED} out of ${TOTAL_PROBLEMS} problems completed."
+    MESSGAE="$(hostname): *Progress report:* _ ${CURRENT_TASK} _ ${NUMBER_COMPLETED} out of ${TOTAL_PROBLEMS} problems completed."
 
     echo $MESSGAE
 
