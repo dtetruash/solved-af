@@ -35,8 +35,6 @@ LONG_DESCRIPTION = F"""{DESCRIPTION} Solved-AF is intended as an educational
 
 
 def main():
-    # TODO Check for SAT solver installation!
-
     args = io.parseArguments()
 
     arguments, attack_relation = io.parseInput(
@@ -51,7 +49,7 @@ def main():
     if args.argument is None:
         taskMethod = tasks.getTaskMethod(task_name, is_enumeration=True)
         solution = taskMethod(af)
-        if task_type == 'SE' and solution:
+        if task_type == 'SE' and solution is not None:
             parsed_solution = af.valuesToArguments(solution)
         elif task_type == 'EE':
             parsed_solution = [af.valuesToArguments(ext) for ext in solution]
