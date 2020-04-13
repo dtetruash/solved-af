@@ -241,4 +241,4 @@ tests
 *.apxm
 
 # binary
-solved-af
+solved-af-static
