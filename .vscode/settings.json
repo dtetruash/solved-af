@@ -8,5 +8,11 @@
         "atts",
         "nargs",
         "networkx"
+    ],
+    "ltex.ignoreRuleInSentence": [
+        {
+            "rule": "DOUBLE_PUNCTUATION",
+            "sentence": "^\\Q...the performance limitations imposed on the solver 10 minute timeout, 2 GB memout... etc..\\E$"
+        }
     ]
 }
