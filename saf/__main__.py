@@ -1,23 +1,24 @@
 """
-usage: solved-af [-h] -p TASKNAME -f INPUTFILE -fo {tgf,apx} [-a <argumentname>]
-                [--formats] [--problems] [-v]
+usage: solved-af [-h] -p -f INPUTFILE - fo {tgf, apx}
+                      [-a < argumentname >]
+                      [--formats][--problems][-v]
 
 required arguments:
-  -p TASKNAME, --problemTask TASKNAME
-                        Path to file containing a argumentation framework
-                        encding
+  -p TASK, --problemTask TASK
+  Path to file containing a argumentation framework encoding
   -f INPUTFILE, --inputFile INPUTFILE
-                        Path to input file encoding an framework
-  -fo {tgf,apx}, --fileFormat {tgf,apx}
-                        Input file format
+  Path to input file encoding an framework
+  -fo {tgf, apx}, --fileFormat {tgf, apx}
+  Input file format
 
 optional arguments:
-  -a <argumentname>, --argument <argumentname>
-                        Argument to check acceptance for
+  -a ARGUMENT, --argument ARGUMENT
+  Argument to check acceptance for
   --formats             List all supported input file formats and exit
   --problems            List all supported problems and exit
-  -v, --validate        Enable validation of the input file before parsing
+  -v, --validate        Validate the input file before parsing
 """
+
 
 import sys
 
@@ -35,6 +36,10 @@ LONG_DESCRIPTION = F"""{DESCRIPTION} Solved-AF is intended as an educational
 
 
 def main():
+    if len(sys.argv) == 1:
+        _showAbout()
+        sys.exit(0)
+
     args = io.parseArguments()
 
     arguments, attack_relation = io.parseInput(
@@ -45,7 +50,9 @@ def main():
     # TODO encapsulate and made DRY
     task_name = args.problemTask.upper()
     task_type = task_name[:2]
+
     parsed_solution = None
+
     if args.argument is None:
         taskMethod = tasks.getTaskMethod(task_name, is_enumeration=True)
         solution = taskMethod(af)
@@ -66,7 +73,4 @@ def _showAbout():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 1:
-        _showAbout()
-        sys.exit(0)
     main()
