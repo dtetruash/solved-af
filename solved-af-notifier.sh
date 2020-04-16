@@ -1,6 +1,6 @@
 #! /bin/bash
 
-if [ $(ps aux | grep run_tests | wc -l) -eq 2 ]; then
+if [ $(ps aux | grep run_tests.sh | wc -l) -eq 2 ] || [ $(ps aux | grep run_decision_tests.sh | wc -l) -eq 2 ]; then
     TESTS_DIR=/home/david/saf/tests
     TEST_DIR=$(ls --sort=time $TESTS_DIR | head -1)
     TEST_FILE=$(ls $TESTS_DIR/$TEST_DIR/*.csv | head -1)
@@ -14,6 +14,6 @@ if [ $(ps aux | grep run_tests | wc -l) -eq 2 ]; then
 
     echo $MESSGAE
 
-    /home/david/anaconda3/bin/telegram-send --format markdown "$MESSGAE"
+    /home/david/anaconda3/bin/ telegram-send --format markdown "$MESSGAE"
 fi
 
