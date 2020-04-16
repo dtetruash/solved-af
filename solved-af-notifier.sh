@@ -14,6 +14,6 @@ if [ $(ps aux | grep run_tests.sh | wc -l) -eq 2 ] || [ $(ps aux | grep run_deci
 
     echo $MESSGAE
 
-    /home/david/anaconda3/bin/ telegram-send --format markdown "$MESSGAE"
+    /home/david/anaconda3/bin/telegram-send --format markdown "$MESSGAE"
 fi
 
