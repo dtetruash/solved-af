@@ -17,7 +17,7 @@ TIMEOUT=${4:-300}
 MEMOUT=${5:-2048}
 
 echo 'Making a output directory for' $(date)
-TEST_NAME=$(date +'%Y-%m-%d_%H-%M-%S-')$SOLVER
+TEST_NAME=$(date +'%Y-%m-%d_%H-%M-%S_')$SOLVER
 
 if [ "$SOLVER" == "solved-af" ]
 then
