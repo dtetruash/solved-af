@@ -1,21 +1,21 @@
 """
-usage: solved-af [-h] -p -f INPUTFILE - fo {tgf, apx}
-                      [-a < argumentname >]
-                      [--formats][--problems][-v]
+usage: solved-af [ -h ] -p TASK -f INPUTFILE -fo {tgf, apx}
+                        [ -a QUERYARGUMENT ]
+                        [ --formats][ --problems][ -v ]
 
 required arguments:
   -p TASK, --problemTask TASK
-  Path to file containing a argumentation framework encoding
+  Argrumentation framework problem task to solve
   -f INPUTFILE, --inputFile INPUTFILE
-  Path to input file encoding an framework
+  Path to file containing an argumentation framework encoding
   -fo {tgf, apx}, --fileFormat {tgf, apx}
   Input file format
 
 optional arguments:
-  -a ARGUMENT, --argument ARGUMENT
+  -a QUERYARGUMENT, --argument QUERYARGUMENT
   Argument to check acceptance for
   --formats             List all supported input file formats and exit
-  --problems            List all supported problems and exit
+  --problems            List all supported problems tasks and exit
   -v, --validate        Validate the input file before parsing
 """
 
