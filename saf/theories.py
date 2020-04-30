@@ -19,18 +19,56 @@
 """
 
 import abc
+from enum import IntEnum
 from typing import Callable, FrozenSet, Generator, List, NewType
 
 import saf.utils as utils
-from saf.argument import Label
 from saf.framework import FrameworkRepresentation as Framework
 
 
+class Label(IntEnum):
+    """Enumeration of possible labels which can be assigned to an
+        argument and their respective numerical values.
+    """
+
+    In = 1
+    Out = 2
+    Und = 3
+
+
 def _calculateLabelVar(arg_value: int, num_of_labels, label=Label.In) -> int:
+    """Given an argument, return the numerical variable which represents
+        that argument being labeled with a label.
+
+    Arguments:
+        arg_value {int} -- argument to get the label variable for
+        num_of_labels {int} -- total number of labels currently used
+
+    Keyword Arguments:
+        label {Label} -- the label for which to get the label variable
+            for (default: {Label.In})
+
+    Returns:
+        int -- the label variable representing the argument labeled with
+            the label
+    """
+
     return num_of_labels * (arg_value - 1) + label
 
 
 def labelVarToArg(label_var: int, num_of_labels) -> float:
+    """Get the argument value which a label variable represents
+    regardless of the actual label.
+
+    Arguments:
+        label_var {int} -- a labeling variable
+        num_of_labels {int} -- the number of variables associated with
+        any one argument
+
+    Returns:
+        int -- the argument which the labelling variable represented
+    """
+
     return (label_var // num_of_labels) + 1
 
 
@@ -55,23 +93,10 @@ def undLabelVariable(arg_value: int) -> int:
     return _calculateLabelVar(arg_value, 3, Label.Und)
 
 
-@utils.memoize
-def stableInLabelVariable(arg_value: int) -> int:
-    return _calculateLabelVar(arg_value, 2, Label.In)
-
-
-@utils.memoize
-def stableOutLabelVariable(arg_value: int) -> int:
-    return _calculateLabelVar(arg_value, 2, Label.Out)
-
-
 # Rename the labelling variable functions to shorter identifiers.
 inLab = inLabelVariable
 outLab = outLabelVariable
 undLab = undLabelVariable
-
-stbInLab = stableInLabelVariable
-stbOutLab = stableOutLabelVariable
 
 
 # Define new types to type hinting
