@@ -26,7 +26,7 @@ It is possible to change the SAT solver command from within the source code via 
 
 ## Installation
 
-### Via `install.sh` script
+#### Via `install.sh` script
 
 Use the included `install.sh` script to install `solved-af`.
 
@@ -40,7 +40,7 @@ $ cd solved-af
 $ chmod +x ./install.sh && ./install.sh
 ```
 
-### Via `pip`
+#### Via `pip`
 
 Use the package manager [`pip`](https://pip.pypa.io/en/stable/) to install `solved-af`.
 
