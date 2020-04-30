@@ -40,7 +40,6 @@ import saf.io as io
 import saf.tasks as tasks
 from saf.framework import ListGraphFramework as Framework
 
-
 NAME = 'Solved-AF'
 VERSION = 0.1
 AUTHOR = 'David Simon Tetruashvili'
@@ -61,13 +60,13 @@ def main():
 
     af = Framework(arguments, attack_relation)
 
-    # TODO encapsulate and made DRY
     task_name = args.problemTask.upper()
     task_type = task_name[:2]
 
     parsed_solution = None
 
     if args.argument is None:
+        # Assuming an enumeration problem
         taskMethod = tasks.getTaskMethod(task_name, is_enumeration=True)
         solution = taskMethod(af)
         if task_type == 'SE' and solution is not None:
@@ -75,8 +74,10 @@ def main():
         elif task_type == 'EE':
             parsed_solution = [af.valuesToArguments(ext) for ext in solution]
     else:
+        # Assuming a decision problem
         taskMethod = tasks.getTaskMethod(task_name, is_enumeration=False)
-        parsed_solution = taskMethod(af, af.argumentToValue(args.argument))
+        argument_value = af.argumentToValue(args.argument)
+        parsed_solution = taskMethod(af, argument_value)
 
     io.outputSolution(parsed_solution, task_type)
 

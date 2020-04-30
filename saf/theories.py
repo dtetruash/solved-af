@@ -13,6 +13,11 @@
 #     You should have received a copy of the GNU General Public License
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""This module provides solved-af with the reductions from AF tasks to
+    SAT and other SAT related/dependant functionalities
+    (e.g., DIMACS parsing).
+"""
+
 import abc
 from typing import Callable, FrozenSet, Generator, List, NewType
 
@@ -31,16 +36,22 @@ def labelVarToArg(label_var: int, num_of_labels) -> float:
 
 @utils.memoize
 def inLabelVariable(arg_value: int) -> int:
+    """Get the SAT in-label variable for a given argument"""
+
     return _calculateLabelVar(arg_value, 3, Label.In)
 
 
 @utils.memoize
 def outLabelVariable(arg_value: int) -> int:
+    """Get the SAT out-label variable for a given argument"""
+
     return _calculateLabelVar(arg_value, 3, Label.Out)
 
 
 @utils.memoize
 def undLabelVariable(arg_value: int) -> int:
+    """Get the SAT und-label variable for a given argument"""
+
     return _calculateLabelVar(arg_value, 3, Label.Und)
 
 
@@ -54,6 +65,7 @@ def stableOutLabelVariable(arg_value: int) -> int:
     return _calculateLabelVar(arg_value, 2, Label.Out)
 
 
+# Rename the labelling variable functions to shorter identifiers.
 inLab = inLabelVariable
 outLab = outLabelVariable
 undLab = undLabelVariable
@@ -62,35 +74,75 @@ stbInLab = stableInLabelVariable
 stbOutLab = stableOutLabelVariable
 
 
+# Define new types to type hinting
 TheoryTemplate = NewType(
     'TheoryTemplate', Callable[[int, Framework], List[List[int]]])
 TheoryRepresentation = NewType('TheoryRepresentation', List[List[int]])
 
 
 class CNFTheory:
-    """Representation of a boolean CNF theory as an object.
-    As a list of disjunctive clauses.
+    """Representation of a boolean CNF theory as an object 
+        as a list of disjunctive clauses which themselves are lists.
     """
 
     def __init__(self, template: TheoryTemplate):
         super().__init__()
-        # FIXME template should build a clause? Or the whole theory?
+        # The template holds a means to generate clauses of the theory
         self._template = template
 
     @classmethod
     def fromTemplateList(cls, templates: List[TheoryTemplate]) -> Generator:
+        """A factory to construct CNFTheory objects from a list
+            of templates
+
+        Arguments:
+            templates {List[TheoryTemplate]} -- list of templates to
+                generate CNFTheories from
+        """
+
         return (cls(template) for template in templates)
 
     @classmethod
     def fromTemplates(cls, *templates: TheoryTemplate) -> Generator:
+        """A factory to construct CNFTheory objects from an enumeration
+            of templates
+        """
         return (cls(template) for template in templates)
 
     def generate(self, argument_value: int,
                  framework: Framework) -> TheoryRepresentation:
+        """Generate the clause dependant on an argument and the
+        framework which contains it.
+
+        Arguments:
+            argument_value {int} -- the argument for which to generate
+                the clause of the theory
+            framework {Framework} -- framework which contains the
+                argument
+
+        Returns:
+            TheoryRepresentation -- representation of the CNF theory
+                generated
+        """
+
         return self._template(argument_value, framework)
 
     def generateAll(self, argument_values: List[int],
                     framework: Framework) -> TheoryRepresentation:
+        """Generate clauses for each of the arguments in an argument
+        list according to the template into one big CNFTheory.
+
+        Arguments:
+            argument_values {List[int]} -- arguments for which to
+                generate clauses
+            framework {Framework} -- framework which contains the
+                arguments
+
+        Returns:
+            TheoryRepresentation -- representation of the CNF theory
+                generated
+        """
+
         ret_cnf = []
         for arg_val in argument_values:
             ret_cnf += self.generate(arg_val, framework)
@@ -98,8 +150,19 @@ class CNFTheory:
 
 
 class TheoryParser(metaclass=abc.ABCMeta):
+    """Abstract class defining the base of a reduction parser from AF to
+        some SAT solver compatible input formulation
+        though CNF theories.
+    """
 
     def __init__(self, *theories):
+        """Constructor of the TheoryParser.
+
+        Arguments:
+            theories {CNFTheory} -- the theories this parser will use
+                for reductions to SAT
+        """
+
         super().__init__()
         self._theories = theories
 
@@ -116,23 +179,32 @@ class TheoryParser(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def parse(self, framework: Framework) -> str:
         """Parse the given theories into a usable format to give to a
-        solver as input.
+        SAT solver as input.
         """
+
         raise NotImplementedError
 
     @abc.abstractmethod
     def parseCNFTheory(self, theory: List[List[int]]) -> str:
-        """Parse the given theories into a usable format to give to a
-        solver as input.
+        """Parse the given theory into a usable format to give as a part
+        of a SAT solver input.
         """
+
         raise NotImplementedError
 
     @abc.abstractstaticmethod
-    def extractExtention(sat_output: str) -> List[int]:
+    def extractExtention(assignment: List[int]) -> List[int]:
+        """Given a variable assignment from a SAT solver extraxt the
+            extension it encodes (only in-labeled arguments).
+        """
         raise NotImplementedError
 
 
 class DIMACSHeader:
+    """Object modeling the header (first-line) of a DIMACS formated
+        file/string.
+    """
+
     def __init__(self, num_of_vars=0, num_of_clauses=0):
         self._vars = num_of_vars
         self._clauses = num_of_clauses
@@ -147,8 +219,11 @@ class DIMACSHeader:
         self._clauses = num_of_clauses
 
 
-# TODO FIXME Make this extent str via __new__
 class DIMACSInput:
+    """Object modeling a DIMACS formated file/string. It consists of
+        a DIMACSHeader and its content.
+    """
+
     def __init__(self, num_of_vars=0, num_of_clauses=0, content=''):
         self._header = DIMACSHeader(num_of_vars, num_of_clauses)
         self._content = content
@@ -165,9 +240,9 @@ class DIMACSInput:
 
 
 class DIMACSParser(TheoryParser):
-    """Given a set of CNF formulae will produce a DIMACS
-    formated file encoding the given argumentation framework
-    into a set of SAT theories.
+    """Given a set of CNF formulae (the reduction to SAT) produce
+        a DIMACS formated file encoding the given argumentation
+        framework into a set of SAT theories.
     """
 
     def __init__(self, *theories: CNFTheory, vars_per_argument=len(Label)):
@@ -219,16 +294,24 @@ class DIMACSParser(TheoryParser):
         return [lab_var for lab_var in assignment if lab_var > 0]
 
 
-"""
-Theory model functions for encoding a full AF for the complete
-extensions.
+#
+# Theory model functions for encoding a full AF for the complete
+# extensions.
 
-Each theory encoding functions take in the argument {a} they are
-encoding into theories and the framework {f} containing said argument.
-"""
-
+# Each theory encoding functions take in the argument {a} they are
+# encoding into theories and the framework {f} containing said argument.
+#
 
 def uniqueness_theory(a, _):
+    """Generate a SAT CNF theory template which ensures that an argument
+        can only be labeled with one label.
+        NB this function is meant to be used as a template for a
+        TheoryParser.
+
+    Arguments:
+        a {int} -- argument to generate the CNF theory for
+    """
+
     return [[inLab(a), outLab(a), undLab(a)],
             [-inLab(a), -outLab(a)],
             [-inLab(a), -undLab(a)],
@@ -236,28 +319,94 @@ def uniqueness_theory(a, _):
 
 
 def complete_in_theory_1(a, f):
+    """Generate a SAT CNF theory template which captures the legality of
+        an argument being in-labeled under complete semantics given the
+        framework it is contained in.
+
+        This template captures the legality in one direction, namely
+        'if all of the argument's attackers are out-labeled, then the
+        argument is in-labeled.'
+
+        NB this function is meant to be used as a template for a
+        TheoryParser.
+
+    Arguments:
+        a {int} -- argument to generate the CNF theory for
+        f {Framework} -- the framework the agrument is contained in
+    """
+
     return [[-outLab(attacker)
              for attacker in f.getAttackersOf(a)]
             + [inLab(a)]]
 
 
 def complete_in_theory_2(a, f):
+    """Generate a SAT CNF theory template which captures the legality of
+        an argument being in-labeled under complete semantics given the
+        framework it is contained in.
+
+        This template captures the legality in one direction, namely
+        'if the argument is in-labeled if arguments it attacks are
+        out-labeled.'
+
+        NB this function is meant to be used as a template for a
+        TheoryParser.
+
+    Arguments:
+        a {int} -- argument to generate the CNF theory for
+        f {Framework} -- the framework the agrument is contained in
+
+    """
+
     return [[-inLab(a), outLab(attacked)]
             for attacked in f.getAttackedBy(a)]
 
 
 def complete_out_theory_1(a, f):
+    """Generate a SAT CNF theory template which captures the legality of
+        an argument being out-labeled under complete semantics given the
+        framework it is contained in.
+
+        This template captures the legality in one direction, namely
+        'if the argument is out-labeled at least one of its attackers
+        is in-labeled.'
+
+        NB this function is meant to be used as a template for a
+        TheoryParser.
+
+    Arguments:
+        a {int} -- argument to generate the CNF theory for
+        f {Framework} -- the framework the agrument is contained in
+    """
+
     return [[-inLab(attacker), outLab(a)]
             for attacker in f.getAttackersOf(a)]
 
 
 def complete_out_theory_2(a, f):
+    """Generate a SAT CNF theory template which captures the legality of
+        an argument being out-labeled under complete semantics given the
+        framework it is contained in.
+
+        This template captures the legality in one direction, namely
+        'if the arguments has attackers which are in-labeled, then it
+        is out-labeled.'
+
+        NB this function is meant to be used as a template for a
+        TheoryParser.
+
+    Arguments:
+        a {int} -- argument to generate the CNF theory for
+        f {Framework} -- the framework the agrument is contained in
+    """
+
     return [[inLab(attacker)
              for attacker in f.getAttackersOf(a)]
             + [-outLab(a)]]
 
 
-# A parser instance for encoding complete extentions
+# A parser instance for encoding complete semantics
+
 
 complete_theories = CNFTheory.fromTemplates(uniqueness_theory,
                                             complete_in_theory_1,
@@ -267,30 +416,51 @@ complete_theories = CNFTheory.fromTemplates(uniqueness_theory,
 
 completeLabelingParser = DIMACSParser(*complete_theories)
 
+#
+# Theory model functions for encoding a full AF for the stable
+# extensions.
 
-"""
-Theory model functions for encoding a full AF for the stable
-extensions.
-
-Each theory encoding functions take in the argument {a} they are
-encoding into theories and the framework {f} containing said argument.
-"""
-
-
-# def stable_uniqueness_theory(a, _):
-#     return [[stbInLab(a), stbOutLab(a)],
-#             [-stbInLab(a), -stbOutLab(a)]]
+# Each theory encoding functions take in the argument {a} they are
+# encoding into theories and the framework {f} containing said argument.
+#
 
 
 def stable_in_theory(a, f):
+    """Generate a SAT CNF theory template which captures the legality of
+        an argument being in-labeled under stable semantics given the
+        framework it is contained in.
+
+        NB this function is meant to be used as a template for a
+        TheoryParser.
+
+       Arguments:
+           a {int} -- argument to generate the CNF theory for
+           f {Framework} -- the framework the agrument is contained in
+       """
+
     clause = [attacker for attacker in f.getAttackersOf(a)]
     clause.append(a)
     return [clause]
 
 
 def stable_out_theory(a, f):
+    """Generate a SAT CNF theory template which captures the legality of
+        an argument being out-labeled under stable semantics given the
+        framework it is contained in.
+
+        NB this function is meant to be used as a template for a
+        TheoryParser.
+
+       Arguments:
+           a {int} -- argument to generate the CNF theory for
+           f {Framework} -- the framework the agrument is contained in
+       """
+
     return [[-attacker, -a]
             for attacker in f.getAttackersOf(a)]
+
+
+# A parser instance for encoding stable semantics
 
 
 stable_theories = CNFTheory.fromTemplates(stable_in_theory, stable_out_theory)

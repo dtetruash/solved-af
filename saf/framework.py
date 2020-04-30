@@ -13,6 +13,10 @@
 #     You should have received a copy of the GNU General Public License
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""This module provides solved-af with represenations of Argumentation
+    Frameworks and related methods.
+"""
+
 import abc
 from typing import List, Set
 
@@ -20,6 +24,7 @@ import saf.utils as utils
 
 
 class FrameworkRepresentation(metaclass=abc.ABCMeta):
+    """Abstract class defining the base framework representation."""
 
     def __init__(self, arguments, attacks):
         super().__init__()
@@ -99,7 +104,9 @@ class FrameworkRepresentation(metaclass=abc.ABCMeta):
 
 class ListGraphFramework(FrameworkRepresentation):
     """Framework representation via keeping a lists for each argument of
-    arguments which it is attacking and is attacked by."""
+        arguments which it is attacking and is attacked by.
+    """
+
     # TODO Add SCC and layer split support in construction
 
     def __init__(self, arguments, attacks):
@@ -135,6 +142,18 @@ class ListGraphFramework(FrameworkRepresentation):
         return retStr
 
     def characteristic(self, argument_values):
+        """The charachteristic function of the AF defined as giving the
+            set of arguments in the AF which defend some other set of
+            arguments.
+
+        Arguments:
+            argument_values {Set[int]} -- the arguments whose defending
+                set to find
+
+        Returns:
+            Set[int] -- the defnding set of argument_values
+        """
+
         # ? Maybe use binary representations of the sets of arguments to
         # ? compair?
 
@@ -172,13 +191,37 @@ class ListGraphFramework(FrameworkRepresentation):
 
 @utils.memoize
 def extensionToInt(extension):
+    """Convert an extension into a binary value of arbitrary precision
+    in order to comapre extensions efficiently.
+
+    Arguments:
+        extension {List[int]} -- the extension to get the
+            binary representation of
+
+    Returns:
+        int -- the representation of the extension
+    """
+
     rep = 0
+
     for arg in extension:
         rep += 2**(arg-1)
+
     return rep
 
 
 def isIncluded(extension, other):
+    """Check if an extension is included in another
+        (w.r.t set inclusion).
+
+    Arguments:
+        extension {List[int]} -- extension to check inclusion for
+        other {List[int]} -- extension to check inclusion against
+
+    Returns:
+        bool -- if the extension is included in the other
+    """
+
     ext_rep = extensionToInt(extension)
     other_rep = extensionToInt(other)
 
@@ -196,6 +239,20 @@ def isIncluded(extension, other):
 
 
 def getAllMaximal(extensions):
+    """Filter all maximal (w.r.t. set inclusion) extension from an
+        iterable. Do this by keeping a reference to a currenly maximal
+        set of extension and either adding the next extension from the
+        iterable to it or removing those found not to be maximal from it
+        after considering the said next extension.
+
+    Arguments:
+        extensions {List[List[int]]} -- list of extensions to find the
+            maximal from w.r.t. the list.
+
+    Returns:
+        Set[List[int]] -- the maximal extensions from the list
+            w.r.t. the list.
+    """
     currently_maximal = set()
 
     for ext in extensions:

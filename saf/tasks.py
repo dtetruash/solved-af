@@ -13,21 +13,39 @@
 #     You should have received a copy of the GNU General Public License
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""This module provides the imeplementations of algorithms used to solve
+    argumentation framework problems/tasks to solved-af.
+"""
+
 import errno
 import subprocess
 import sys
 
 from saf.framework import getAllMaximal
-from saf.theories import DIMACSParser
-from saf.theories import completeLabelingParser, stableLabellingParser
+from saf.theories import (DIMACSParser, completeLabelingParser,
+                          stableLabellingParser)
 
+# Set the external SAT solver command here as a list of individual
+# command arguments along with the expected return code indicating that
+# the external SAT solver deems the given theory UNSATISFIABLE.
 SAT_COMMAND = ['glucose-syrup', '-model', '-verb=0']
 UNSAT_RET_CODE = 20
 
 
 def runSATSolver(encoded_sat_input):
-    """TODO Use input buffers and Popen() to write to the buffer
-        stream directly"""
+    """Given DIMACS encoded (or encoded for your solver) input, run the
+        SAT solver from SAT_COMMAND on the input and return the solver
+        process object.
+
+    Arguments:
+        encoded_sat_input {str} -- string into to the external
+            SAT solver
+
+    Returns:
+        subprocess.CompletedProcess -- object representation of the
+            external SAT solver process that has finished.
+    """
+
     try:
         solver = subprocess.run(SAT_COMMAND, stdout=subprocess.PIPE,
                                 input=encoded_sat_input, encoding='ascii')
@@ -66,6 +84,16 @@ def negateClause(clause):
 
 
 def extractAssignment(raw_dimacs_output):
+    """Extract a labelling variable assignment from the external SAT
+        solver output.
+
+    Arguments:
+        raw_dimacs_output {str} -- DIAMCS encoded SAT solver output
+
+    Returns:
+        List[int] -- labelling variable assignment
+    """
+
     # TODO Find the line which starts with 'v' explicitly,
     # TODO raise error if not found
     assignment_line = raw_dimacs_output.split('\n')[-2]
@@ -75,6 +103,17 @@ def extractAssignment(raw_dimacs_output):
 
 
 def excludeAssignment(solution, sat_input):
+    """Add an additional clause to the SAT solver DIMACS input which
+        will prevent an already found assignment to be generated again
+        in subsuquent SAT solver runs. The clause added is the negation
+        of the positive literals of the given assignment.
+
+    Arguments:
+        solution {List[int]} -- a labelling variable assignment
+        sat_input {saf.theories.DIMACSInput} -- object representing
+            current SAT solver input
+    """
+
     # TODO Extract methods from DIMACS parser
     positive_literals = DIMACSParser.extractPositiveLiterals(solution)
     negation_clause = negateClause(positive_literals)
@@ -83,6 +122,21 @@ def excludeAssignment(solution, sat_input):
 
 
 def singleEnumeration(framework, reduction_parser):
+    """Solve a single enumeration (SE) AF problem given a framework and
+        a reduction parser to some argumentation semantics.
+
+    Arguments:
+        framework {saf.framework.FrameworkRepresentation} -- object
+            representing the argumentation framework
+        reduction_parser {saf.theories.DIMACSParser} -- parser object
+            to construct the reduction of the framework to a SAT solver
+            problem input
+
+    Returns:
+        List[int] or None -- the solution to the single enumeration
+            problem; None indicates 'no solution;
+    """
+
     sat_input = reduction_parser.parse(framework)
 
     solver = runSATSolver(sat_input.encode())
@@ -98,6 +152,20 @@ def singleEnumeration(framework, reduction_parser):
 
 
 def fullEnumeration(framework, reduction_parser):
+    """Solve a full enumeration (EE) AF problem given a framework and
+        a reduction parser to some argumentation semantics.
+
+    Arguments:
+        framework {saf.framework.FrameworkRepresentation} -- object
+            representing the argumentation framework
+        reduction_parser {saf.theories.DIMACSParser} -- parser object
+            to construct the reduction of the framework to a SAT solver
+            problem input
+
+    Returns:
+        List[List[int]] -- the solution to the full enumeration problem
+    """
+
     sat_input = reduction_parser.parse(framework)
 
     while True:
@@ -114,6 +182,21 @@ def fullEnumeration(framework, reduction_parser):
 
 
 def credulousDecision(framework, argument_value, enumeration_function):
+    """Solve a credulous decision (DC) AF problem given a framework, the
+        query argument's value, and the function which enumerates the
+        extensions of the AF under the relevant semantics.
+
+    Arguments:
+         framework {saf.framework.FrameworkRepresentation} -- object
+            representing the argumentation framework
+        argument_value {int} -- the value of the query argument
+        enumeration_function {Callable} -- a method which fully
+            enumerates all AF's extensions under some semantics
+
+    Returns:
+        bool -- solution to the credulous decision problem
+    """
+
     # TODO Test whether it is faster to use 'isIncluded' here.
     # TODO needs to be lazy, i.e. check after each extension is generated.
     return any(argument_value in extension
@@ -121,29 +204,56 @@ def credulousDecision(framework, argument_value, enumeration_function):
 
 
 def skepticalDecision(framework, argument_value, enumeration_function):
+    """Solve a skeptical decision (DS) AF problem given a framework, the
+        query argument's value, and the function which enumerates the
+        extensions of the AF under the relevant semantics.
+
+    Arguments:
+         framework {saf.framework.FrameworkRepresentation} -- object
+            representing the argumentation framework
+        argument_value {int} -- the value of the query argument
+        enumeration_function {Callable} -- a method which fully
+            enumerates all AF's extensions under some semantics
+
+    Returns:
+        bool -- solution to the skeptical decision problem
+    """
+
     return all(argument_value in extension
                for extension in enumeration_function(framework))
 
-
-"""
-Concrete task implementations.
-"""
+#
+# Concrete task implementations.
+#
 
 
 def groundedSingleEnumeration(framework):
-    # U_{1..inf} F^i({})
+    """Generate the grounded extension of the framework via the
+        fixed-point of the framework's characteristic function F:
+
+                    Ext_GR = U_{i=1..inf} F^i({})
+
+        See (Dung,1995): https://doi.org/10.1016/0004-3702(94)00041-X
+
+    Arguments:
+        framework {saf.framework.FrameworkRepresentation} -- object
+            representing the argumentation framework]
+
+    Returns:
+        List[int] -- the grounded extension of the framework
+    """
+
+    # ? Would filtering complete extensions be quicker?
+
     grounded_extension = set()
     curr_characteristic = set()
-
-    # Currently this is an O(n^n) operation... as each call to
-    # framework.characteristic is O(n) and it may loop n+1 times...
-    # ? Would filtering complete extensions be quicker?
 
     while True:
         next_characteristic = framework.characteristic(curr_characteristic)
         grounded_extension |= next_characteristic
 
         if next_characteristic == curr_characteristic:
+            # iterate untill convergance
             break
 
         curr_characteristic = next_characteristic
@@ -152,6 +262,18 @@ def groundedSingleEnumeration(framework):
 
 
 def groundedCredulousDecision(framework, argument_value):
+    """Solve the credulous decision problem under grounded semantics
+    given a framework and the query argument's value.
+
+    Arguments:
+        framework {saf.framework.FrameworkRepresentation} -- object
+            representing the argumentation framework
+        argument_value {int} -- the value of the query argument]
+
+    Returns:
+        bool -- solution to the credulous decision problem
+    """
+
     # ! groundedCredulousDecision could be optimised further if the
     # ! extension would be constructed iteratively and the check would
     # ! be made at each iteration against the new additions.
@@ -160,70 +282,118 @@ def groundedCredulousDecision(framework, argument_value):
 
 
 def completeFullEnumeration(framework):
+    """Solve the full enumeration problem under complete semantics
+    given a framework.
+    """
+
     return fullEnumeration(framework, completeLabelingParser)
 
 
 def completeSingleEnumeration(framework):
+    """Solve the single enumeration problem under complete semantics
+        given a framework.
+    """
+
     return singleEnumeration(framework, completeLabelingParser)
 
 
 def completeCredulousDecision(framework, argument_value):
+    """Solve the credulous decision problem under complete semantics
+        given a framework and the query argument's value.
+    """
+
     return credulousDecision(framework, argument_value,
                              completeFullEnumeration)
 
 
 def completeSkepticalDecision(framework, argument_value):
+    """Solve the skeptical decision problem under complete semantics
+        given a framework and the query argument's value.
+    """
+
     return skepticalDecision(framework, argument_value,
                              completeFullEnumeration)
 
 
 def preferredFullEnumeration(framework):
-    complete_extensions = completeFullEnumeration(framework)
+    """Solve the full enumeration problem under grounded semantics
+        given a framework. Do this via filtering complete extensions.
+    """
 
+    complete_extensions = completeFullEnumeration(framework)
     return getAllMaximal(complete_extensions)
 
 
 def preferredSingleEnumeration(framework):
+    """Solve the single enumeration problem under preferred semantics
+        given a framework.
+    """
+
     try:
         return preferredFullEnumeration(framework).pop()
     except KeyError:
+        # A Preferred extension is unversally defined for any framework.
+        # Nevertheless, this except block is added for implementational
+        # safety.
         return None
-    # try:
-    #     return next(preferredFullEnumeration(framework))
-    # except StopIteration:
-    #     return None
 
 
 def preferredCredulousDecision(framework, argument_value):
+    """Solve the credulous decision problem under preferred semantics
+        given a framework and the query argument's value.
+    """
+
     return credulousDecision(framework, argument_value,
                              preferredFullEnumeration)
 
 
 def preferredSkepticalDecision(framework, argument_value):
+    """Solve the skeptical decision problem under preferred semantics
+        given a framework and the query argument's value.
+    """
+
     return skepticalDecision(framework, argument_value,
                              preferredFullEnumeration)
 
 
 def stableFullEnumeration(framework):
+    """Solve the full enumeration problem under stable semantics
+        given a framework.
+    """
+
     return fullEnumeration(framework, stableLabellingParser)
 
 
 def stableSingleEnumeration(framework):
+    """Solve the single enumeration problem under stable semantics
+        given a framework.
+    """
     return singleEnumeration(framework, stableLabellingParser)
 
 
 def stableCredulousDecision(framework, argument_value):
+    """Solve the credulous decision problem under stable semantics
+        given a framework and the query argument's value.
+    """
+
     return credulousDecision(framework, argument_value,
                              stableFullEnumeration)
 
 
 def stableSkepticalDecision(framework, argument_value):
+    """Solve the skeptical decision problem under stable semantics
+        given a framework and the query argument's value.
+    """
+
     return skepticalDecision(framework, argument_value,
                              stableFullEnumeration)
 
 
 _enumerationTasksFunctions = {
-    # Complete semantics`
+    # Here list all suporeted enumeration tasks along with the method
+    # which is used to solve said task.
+
+    # Complete semantics
     'EE-CO': completeFullEnumeration,
     'SE-CO': completeSingleEnumeration,
 
@@ -240,6 +410,9 @@ _enumerationTasksFunctions = {
 }
 
 _decisionTaskFunctions = {
+    # Here list all suporeted decision tasks along with the method
+    # which is used to solve said task.
+
     # Complete semantics
     'DC-CO': completeCredulousDecision,
     'DS-CO': completeSkepticalDecision,
@@ -263,13 +436,24 @@ def getTasks():
 
 
 def getTaskMethod(task_name, is_enumeration=True):
+    """Return the method which solves the given AF problem task.
+
+    Arguments:
+        task_name {str} -- the AF problem task identifier (e.g., EE-CO)
+
+    Keyword Arguments:
+        is_enumeration {bool} -- Explicit flag separation the
+            enumeration and desicion tasks  (default: {True})
+
+    Returns:
+        Callable -- the method which solves the given task
+    """
     try:
         task_method = _enumerationTasksFunctions[task_name] \
             if is_enumeration else \
             _decisionTaskFunctions[task_name]
         return task_method
     except KeyError:
-        # TODO !!! Deligate this error throw to Argsparse or __main__
         error_msg = (
             task_name + ' is {} task and {} either the '
             '\'-a\' or \'--argument\' option!\n'

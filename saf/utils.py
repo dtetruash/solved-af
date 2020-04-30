@@ -13,19 +13,21 @@
 #     You should have received a copy of the GNU General Public License
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""This method provides some misc. untilities to solved-af."""
+
 
 def flatten(list_to_flatten):
-    # https://stackoverflow.com/a/952952/5065263
+    # Credit to https://stackoverflow.com/a/952952/5065263
     return [item for sublist in list_to_flatten for item in sublist]
 
 
 def flattenSet(set_to_flatten):
-    # https://stackoverflow.com/a/952952/5065263
+    # Credit to https://stackoverflow.com/a/952952/5065263
     return {item for sublist in set_to_flatten for item in sublist}
 
 
 def memoize(func):
-    # https://dbader.org/blog/python-memoization
+    # Credit to https://dbader.org/blog/python-memoization
     cache = {}
 
     def memoized_func(*args):
