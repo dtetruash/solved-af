@@ -56,7 +56,7 @@ $ pip install -e .
 
 ## Usage
 
-`solved-af` follows the established ICCMA solver interface closely with the added option of switching input validation via the `-v` flag.
+`solved-af` follows the established ICCMA solver interface closely with the added option of input validation via the `-v` flag.
 
 <p align="center">
   <img src="./images/usage.png" width="800px" />
