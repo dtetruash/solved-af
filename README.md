@@ -2,7 +2,10 @@
 
 ## an abstract argumentation framework solver to learn from.
 
-![solved-af example](./images/solved-af-example.svg)
+<p align="center">
+  <img src="./images/solved-af-example.svg" width="800px" />
+</p>
+<!-- ![solved-af example](./images/solved-af-example.svg) -->
 
 This repository contains the implementation of an argumentation framework solver to be submitted as part of the final year project (Bachelor Thesis) of David Simon Tetruashvili @ King's College London.
 
