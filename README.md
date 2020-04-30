@@ -8,7 +8,7 @@
 
 This repository contains the implementation of an argumentation framework solver to be submitted as part of the final year project (Bachelor Thesis) of David Simon Tetruashvili @ King's College London.
 
-`solved-af`...
+## `solved-af`...
 
 - ...is SAT-reduction based.
 
@@ -18,7 +18,7 @@ This repository contains the implementation of an argumentation framework solver
 
 - ...is capable of solving all classic track problems under the Dung's four main abstract argumentation semantics.
 
-# Prerequisites
+## Prerequisites
 
 **`solved-af` uses [`glucode-syrup`](https://www.labri.fr/perso/lsimon/glucose/) SAT solver.** `glucode-syrup` has to be installed in the `PATH` for `solved-af` to work out of the box.
 
