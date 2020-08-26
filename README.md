@@ -1,4 +1,4 @@
-# [`solved-af`](https://github.kcl.ac.uk/K1764158/solved-af) — Solved Argumentation Framework
+# [`solved-af`](https://github.com/davzzar/solved-af) — Solved Argumentation Framework
 
 ## an abstract argumentation framework solver to learn from.
 
